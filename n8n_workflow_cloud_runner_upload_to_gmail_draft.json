@@ -1,0 +1,341 @@
+{
+  "name": "PILOT (Cloud) → Upload 3 Excel → Runner → Pilot_Results_v2.xlsx → Gmail Draft",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a5c1f46a-f0f8-4c5d-9f1c-0e5f3b8d2a11",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        260,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": "REPLACE_WEEKLY_FILE_ID"
+      },
+      "id": "1b8b2b6d-1f58-4a7c-9b54-1b2e4c2d7c61",
+      "name": "Google Drive - Download Weekly",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 1,
+      "position": [
+        520,
+        120
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_DRIVE_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": "REPLACE_HISTORY_FILE_ID"
+      },
+      "id": "f2d2d7c1-1a3c-4b5a-9c11-8c6e7f2a1b33",
+      "name": "Google Drive - Download History",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 1,
+      "position": [
+        520,
+        240
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_DRIVE_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": "REPLACE_MAPPING_FILE_ID"
+      },
+      "id": "c1f6f0d4-3a62-4b3a-9c2e-8d5f1a0b3c77",
+      "name": "Google Drive - Download Mapping",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 1,
+      "position": [
+        520,
+        360
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_DRIVE_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "multiplex"
+      },
+      "id": "b7c7d03f-1a54-4d60-95a7-3c7b1f3a2a02",
+      "name": "Merge (3 files)",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        780,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// מצפה ל-3 items מה-merge, כל אחד עם binary בשם data\n// נסמן אותם בשמות שונים כדי ש-HTTP Request יוכל לשלוח multipart.\n\nconst out = [];\nfor (const item of items) {\n  const name = item.json?.name || item.json?.fileName || '';\n  // לא תמיד יש שם; לכן נשתמש בסדר הזרימה: Weekly/History/Mapping לפי node.\n  out.push(item);\n}\n\n// נניח שסדר items הוא: Weekly, History, Mapping\nconst [weekly, history, mapping] = out;\n\nweekly.binary = weekly.binary || {};\nhistory.binary = history.binary || {};\nmapping.binary = mapping.binary || {};\n\n// שכפול data ל-3 שדות בינאריים\nweekly.binary.weekly = weekly.binary.data;\nhistory.binary.history = history.binary.data;\nmapping.binary.mapping = mapping.binary.data;\n\n// מחזירים item אחד עם שלושת הבינאריים\nreturn [{ json: {}, binary: { weekly: weekly.binary.weekly, history: history.binary.history, mapping: mapping.binary.mapping } }];"
+      },
+      "id": "3e9a2f5c-9f65-4b4d-8f6a-8e2b1c6d5a04",
+      "name": "Code (Prepare multipart binaries)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1020,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE_WITH_YOUR_CLOUD_RUNNER_URL/run-pilot/from-files",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "weekly",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "weekly"
+            },
+            {
+              "name": "history",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "history"
+            },
+            {
+              "name": "mapping",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "mapping"
+            }
+          ]
+        },
+        "responseFormat": "file",
+        "options": {
+          "timeout": 3600000
+        }
+      },
+      "id": "8b54a9c2-2f2a-4c1b-9b0e-7f1a2b3c4d5e",
+      "name": "HTTP Request (Run Pilot in Cloud Runner)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1260,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "options": {
+          "sheetName": "Drafts"
+        }
+      },
+      "id": "e7c2b6a1-4c3d-4a2b-9f6e-1a2b3c4d5e6f",
+      "name": "Spreadsheet File (Drafts → JSON)",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "function safe(v) { return v === null || v === undefined ? '' : String(v); }\n\nconst rows = items.map(i => i.json);\nif (!rows.length) {\n  return [{ json: { to: '', subject: 'Pilot: אין נתונים לשליחה', message: 'לא נמצאו שורות בגיליון Drafts.' } }];\n}\n\nfunction groupKey(r) {\n  return [\n    safe(r.CustomerNumber),\n    safe(r.KodKupa_IdentityNumber),\n    safe(r.KodKupa_IncomeTax),\n    safe(r.ErrorCode),\n    safe(r.Responsibility)\n  ].join('||');\n}\n\nconst groups = new Map();\nfor (const r of rows) {\n  const k = groupKey(r);\n  if (!groups.has(k)) groups.set(k, []);\n  groups.get(k).push(r);\n}\n\nconst firstKey = groups.keys().next().value;\nconst group = groups.get(firstKey);\nconst sample = group[0];\n\nconst byWeek = new Map();\nconst uniqueEmployees = new Set();\nfor (const r of group) {\n  const emp = safe(r.EmployeeID);\n  if (emp) uniqueEmployees.add(emp);\n  const w = Number(r.DurationWeeks || 1);\n  const bucket = Number.isFinite(w) ? (w > 5 ? '>5' : String(w)) : '1';\n  if (!byWeek.has(bucket)) byWeek.set(bucket, new Set());\n  if (emp) byWeek.get(bucket).add(emp);\n}\n\nconst buckets = ['1','2','3','4','5','>5'];\nconst lines = buckets\n  .filter(b => byWeek.has(b))\n  .map(b => `שבוע ${b}: ${byWeek.get(b).size}`);\n\nconst customer = safe(sample.CustomerNumber);\nconst fundId = `${safe(sample.KodKupa_IdentityNumber)}-${safe(sample.KodKupa_IncomeTax)}`;\nconst err = safe(sample.ErrorCode);\nconst resp = safe(sample.Responsibility);\n\nconst subject = `Pilot Draft (דוגמה): מעסיק ${customer} | קופה ${fundId} | קוד ${err} | ${resp}`;\n\nconst message = [\n  'שלום,',\n  '',\n  'זהו מייל דוגמה שנוצר אוטומטית מהפיילוט.',\n  'הקובץ Pilot_Results_v2.xlsx מצורף כנספח.',\n  '',\n  `מעסיק: ${customer}`,\n  `קופה: ${fundId}`,\n  `קוד שגיאה: ${err}`,\n  `אחריות: ${resp}`,\n  '',\n  `כמות ת.ז. ייחודיות בקבוצה: ${uniqueEmployees.size}`,\n  lines.length ? 'התפלגות לפי שבועות: ' + lines.join(' | ') : '',\n  '',\n  'תודה'\n].filter(Boolean).join('\\n');\n\nconst to = $env.GMAIL_TEST_TO || 'your@email.com';\nreturn [{ json: { to, subject, message } }];"
+      },
+      "id": "c5f2a1b3-9d7e-4f1a-8c2b-1d2e3f4a5b6c",
+      "name": "Code (Build Sample Email)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1740,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "mergeByIndex"
+      },
+      "id": "d2e3f4a5-b6c7-4d8e-9f01-2a3b4c5d6e7f",
+      "name": "Merge (Email + Attachment)",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "operation": "create",
+        "toList": "={{$json.to}}",
+        "subject": "={{$json.subject}}",
+        "message": "={{$json.message}}",
+        "attachmentsBinary": "data"
+      },
+      "id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+      "name": "Gmail (Create Draft)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        2220,
+        240
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Download Weekly",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Drive - Download History",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Drive - Download Mapping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Download Weekly": {
+      "main": [
+        [
+          {
+            "node": "Merge (3 files)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Download History": {
+      "main": [
+        [
+          {
+            "node": "Merge (3 files)",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Google Drive - Download Mapping": {
+      "main": [
+        [
+          {
+            "node": "Merge (3 files)",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge (3 files)": {
+      "main": [
+        [
+          {
+            "node": "Code (Prepare multipart binaries)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Prepare multipart binaries)": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request (Run Pilot in Cloud Runner)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request (Run Pilot in Cloud Runner)": {
+      "main": [
+        [
+          {
+            "node": "Spreadsheet File (Drafts → JSON)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge (Email + Attachment)",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Spreadsheet File (Drafts → JSON)": {
+      "main": [
+        [
+          {
+            "node": "Code (Build Sample Email)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Build Sample Email)": {
+      "main": [
+        [
+          {
+            "node": "Merge (Email + Attachment)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge (Email + Attachment)": {
+      "main": [
+        [
+          {
+            "node": "Gmail (Create Draft)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionTimeout": 3600
+  },
+  "versionId": "1"
+}
+
+

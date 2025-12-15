@@ -1,0 +1,188 @@
+{
+  "name": "Pilot → יצירת Pilot_Results_v2 + Gmail Draft (דוגמה)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b1d6c0f2-1c37-4f16-ae62-1aa4fdbf2c01",
+      "name": "טריגר ידני",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        260,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "command": "cmd /c \"cd /d C:\\Users\\nirav\\Avivi-Solutions\\השקט שלך && py -3 pilot_engine.py\""
+      },
+      "id": "6f4f8d9a-8b64-4d24-8aa3-5fdadcb68ad9",
+      "name": "הרצת פיילוט (Python)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        520,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "filePath": "C:\\Users\\nirav\\Avivi-Solutions\\השקט שלך\\Pilot_Results_v2.xlsx"
+      },
+      "id": "b76cd8ac-f2f3-4101-b2f0-55df60c6a2b7",
+      "name": "קריאת Pilot_Results_v2.xlsx",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        780,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "options": {
+          "sheetName": "Drafts"
+        }
+      },
+      "id": "8b3f7d3a-72a0-4c91-9a9b-5b1c59cf1a8e",
+      "name": "קריאת גיליון Drafts (Excel → JSON)",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "function safe(v) { return v === null || v === undefined ? '' : String(v); }\n\n// כל שורה מה-Spreadsheet File מגיעה כ-item עם json של עמודות.\nconst rows = items.map(i => i.json);\nif (!rows.length) {\n  return [{ json: { to: '', subject: 'Pilot: אין נתונים לשליחה', message: 'לא נמצאו שורות בגיליון Drafts.' } }];\n}\n\n// קיבוץ ברמת מפתח ייחודי: מעסיק + קופה + קוד שגיאה + אחריות\nfunction groupKey(r) {\n  return [\n    safe(r.CustomerNumber),\n    safe(r.KodKupa_IdentityNumber),\n    safe(r.KodKupa_IncomeTax),\n    safe(r.ErrorCode),\n    safe(r.Responsibility)\n  ].join('||');\n}\n\nconst groups = new Map();\nfor (const r of rows) {\n  const k = groupKey(r);\n  if (!groups.has(k)) groups.set(k, []);\n  groups.get(k).push(r);\n}\n\n// לוקחים קבוצה ראשונה כדוגמה\nconst firstKey = groups.keys().next().value;\nconst group = groups.get(firstKey);\nconst sample = group[0];\n\n// התפלגות DurationWeeks בקבוצה (ספירת ת.ז. ייחודיות)\nconst byWeek = new Map();\nconst uniqueEmployees = new Set();\nfor (const r of group) {\n  const emp = safe(r.EmployeeID);\n  if (emp) uniqueEmployees.add(emp);\n  const w = Number(r.DurationWeeks || 1);\n  const bucket = Number.isFinite(w) ? (w > 5 ? '>5' : String(w)) : '1';\n  if (!byWeek.has(bucket)) byWeek.set(bucket, new Set());\n  if (emp) byWeek.get(bucket).add(emp);\n}\n\nconst buckets = ['1','2','3','4','5','>5'];\nconst lines = buckets\n  .filter(b => byWeek.has(b))\n  .map(b => `שבוע ${b}: ${byWeek.get(b).size}`);\n\nconst customer = safe(sample.CustomerNumber);\nconst fundId = `${safe(sample.KodKupa_IdentityNumber)}-${safe(sample.KodKupa_IncomeTax)}`;\nconst err = safe(sample.ErrorCode);\nconst resp = safe(sample.Responsibility);\n\nconst subject = `Pilot Draft (דוגמה): מעסיק ${customer} | קופה ${fundId} | קוד ${err} | ${resp}`;\n\nconst message = [\n  'שלום,',\n  '',\n  'זהו מייל דוגמה שנוצר אוטומטית מ-Pilot_Results_v2.xlsx (גיליון Drafts).',\n  '',\n  `מעסיק: ${customer}`,\n  `קופה: ${fundId}`,\n  `קוד שגיאה: ${err}`,\n  `אחריות: ${resp}`,\n  '',\n  `כמות ת.ז. ייחודיות בקבוצה: ${uniqueEmployees.size}`,\n  lines.length ? 'התפלגות לפי שבועות: ' + lines.join(' | ') : '',\n  '',\n  'מצורף: Pilot_Results_v2.xlsx',\n  '',\n  'תודה'\n].filter(Boolean).join('\\n');\n\n// יעד ברירת מחדל: המשתמש יעדכן לכתובת שלו או ישתמש ב-ENV\nconst to = $env.GMAIL_TEST_TO || 'your@email.com';\n\nreturn [{ json: { to, subject, message } }];"
+      },
+      "id": "2e8dd2c4-ece3-4d72-9de1-4e8bd3d76e3a",
+      "name": "בניית מייל דוגמה (קבוצה ראשונה)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "mergeByIndex"
+      },
+      "id": "b5c81bff-5480-4ed0-9c8e-2f66ab3b0e6a",
+      "name": "מיזוג (מייל + קובץ כמצורף)",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "operation": "create",
+        "toList": "={{$json.to}}",
+        "subject": "={{$json.subject}}",
+        "message": "={{$json.message}}",
+        "attachmentsBinary": "data"
+      },
+      "id": "d8e7d4d6-b18b-4b0b-86db-4a7d5fd4b0e5",
+      "name": "Gmail: יצירת Draft",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        1820,
+        220
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "טריגר ידני": {
+      "main": [
+        [
+          {
+            "node": "הרצת פיילוט (Python)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "הרצת פיילוט (Python)": {
+      "main": [
+        [
+          {
+            "node": "קריאת Pilot_Results_v2.xlsx",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "קריאת Pilot_Results_v2.xlsx": {
+      "main": [
+        [
+          {
+            "node": "קריאת גיליון Drafts (Excel → JSON)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "מיזוג (מייל + קובץ כמצורף)",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "קריאת גיליון Drafts (Excel → JSON)": {
+      "main": [
+        [
+          {
+            "node": "בניית מייל דוגמה (קבוצה ראשונה)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "בניית מייל דוגמה (קבוצה ראשונה)": {
+      "main": [
+        [
+          {
+            "node": "מיזוג (מייל + קובץ כמצורף)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "מיזוג (מייל + קובץ כמצורף)": {
+      "main": [
+        [
+          {
+            "node": "Gmail: יצירת Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionTimeout": 3600
+  },
+  "versionId": "1"
+}
+
+

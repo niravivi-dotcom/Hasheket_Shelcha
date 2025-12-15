@@ -1,0 +1,198 @@
+{
+  "name": "PILOT (Cloud) → Runner → Excel → Gmail Draft",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "8b0b09a6-cc76-4a20-9d0a-2fd69b5b0c61",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        260,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE_WITH_YOUR_PUBLIC_RUNNER_URL/run-pilot",
+        "responseFormat": "json",
+        "options": {
+          "timeout": 3600000
+        }
+      },
+      "id": "fd7b25ae-97c6-4f8c-8f8e-d2b1c3c707ac",
+      "name": "HTTP Request (Run Pilot)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        520,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://REPLACE_WITH_YOUR_PUBLIC_RUNNER_URL/latest/file",
+        "responseFormat": "file",
+        "options": {
+          "timeout": 3600000
+        }
+      },
+      "id": "9c1f8df8-6d7a-4b1b-a9b1-7b6d44a9c1bf",
+      "name": "HTTP Request (Download XLSX)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        740,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "options": {
+          "sheetName": "Drafts"
+        }
+      },
+      "id": "dc4cf79c-ae5f-4b3a-80b6-65ec9b13c1b5",
+      "name": "Spreadsheet File (Drafts → JSON)",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 1,
+      "position": [
+        980,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "function safe(v) { return v === null || v === undefined ? '' : String(v); }\n\nconst rows = items.map(i => i.json);\nif (!rows.length) {\n  return [{ json: { to: '', subject: 'Pilot: אין נתונים לשליחה', message: 'לא נמצאו שורות בגיליון Drafts.' } }];\n}\n\nfunction groupKey(r) {\n  return [\n    safe(r.CustomerNumber),\n    safe(r.KodKupa_IdentityNumber),\n    safe(r.KodKupa_IncomeTax),\n    safe(r.ErrorCode),\n    safe(r.Responsibility)\n  ].join('||');\n}\n\nconst groups = new Map();\nfor (const r of rows) {\n  const k = groupKey(r);\n  if (!groups.has(k)) groups.set(k, []);\n  groups.get(k).push(r);\n}\n\nconst firstKey = groups.keys().next().value;\nconst group = groups.get(firstKey);\nconst sample = group[0];\n\nconst byWeek = new Map();\nconst uniqueEmployees = new Set();\nfor (const r of group) {\n  const emp = safe(r.EmployeeID);\n  if (emp) uniqueEmployees.add(emp);\n  const w = Number(r.DurationWeeks || 1);\n  const bucket = Number.isFinite(w) ? (w > 5 ? '>5' : String(w)) : '1';\n  if (!byWeek.has(bucket)) byWeek.set(bucket, new Set());\n  if (emp) byWeek.get(bucket).add(emp);\n}\n\nconst buckets = ['1','2','3','4','5','>5'];\nconst lines = buckets\n  .filter(b => byWeek.has(b))\n  .map(b => `שבוע ${b}: ${byWeek.get(b).size}`);\n\nconst customer = safe(sample.CustomerNumber);\nconst fundId = `${safe(sample.KodKupa_IdentityNumber)}-${safe(sample.KodKupa_IncomeTax)}`;\nconst err = safe(sample.ErrorCode);\nconst resp = safe(sample.Responsibility);\n\nconst subject = `Pilot Draft (דוגמה): מעסיק ${customer} | קופה ${fundId} | קוד ${err} | ${resp}`;\n\nconst message = [\n  'שלום,',\n  '',\n  'זהו מייל דוגמה שנוצר אוטומטית מהפיילוט.',\n  'הקובץ Pilot_Results_v2.xlsx מצורף כנספח.',\n  '',\n  `מעסיק: ${customer}`,\n  `קופה: ${fundId}`,\n  `קוד שגיאה: ${err}`,\n  `אחריות: ${resp}`,\n  '',\n  `כמות ת.ז. ייחודיות בקבוצה: ${uniqueEmployees.size}`,\n  lines.length ? 'התפלגות לפי שבועות: ' + lines.join(' | ') : '',\n  '',\n  'תודה'\n].filter(Boolean).join('\\n');\n\nconst to = $env.GMAIL_TEST_TO || 'your@email.com';\nreturn [{ json: { to, subject, message } }];"
+      },
+      "id": "6b7a7bdc-94a3-4c61-8a66-4ec9d5e2d8a6",
+      "name": "Code (Build Sample Email)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "mergeByIndex"
+      },
+      "id": "3d1f7a9b-fc7c-4e64-85a4-2e61c5a1b8fe",
+      "name": "Merge (Email + Attachment)",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "operation": "create",
+        "toList": "={{$json.to}}",
+        "subject": "={{$json.subject}}",
+        "message": "={{$json.message}}",
+        "attachmentsBinary": "data"
+      },
+      "id": "d7e66d58-b7d3-4c2f-9f48-60e8c0b5a1d6",
+      "name": "Gmail (Create Draft)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        240
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request (Run Pilot)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request (Run Pilot)": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request (Download XLSX)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request (Download XLSX)": {
+      "main": [
+        [
+          {
+            "node": "Spreadsheet File (Drafts → JSON)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge (Email + Attachment)",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Spreadsheet File (Drafts → JSON)": {
+      "main": [
+        [
+          {
+            "node": "Code (Build Sample Email)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Build Sample Email)": {
+      "main": [
+        [
+          {
+            "node": "Merge (Email + Attachment)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge (Email + Attachment)": {
+      "main": [
+        [
+          {
+            "node": "Gmail (Create Draft)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionTimeout": 3600
+  },
+  "versionId": "1"
+}
+
+
