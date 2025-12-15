@@ -14,6 +14,6 @@ ENV PORT=10000
 EXPOSE 10000
 
 # Render / generic: bind to 0.0.0.0 and use gunicorn
-CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:${PORT}", "pilot_runner_server:app"]
+CMD ["sh", "-c", "gunicorn -w 2 -b 0.0.0.0:$PORT pilot_runner_server:app"]
 
 
