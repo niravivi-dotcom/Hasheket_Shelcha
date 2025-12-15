@@ -14,6 +14,7 @@ OUTFILE = APP_DIR / "Pilot_Results_v2.xlsx"
 PILOT_ENGINE = APP_DIR / "pilot_engine.py"
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_CONTENT_LENGTH", str(350 * 1024 * 1024)))
 
 
 def run_pilot() -> tuple[bool, str]:
@@ -115,10 +116,29 @@ def run_pilot_from_files():
     with tempfile.TemporaryDirectory(prefix="pilot_run_") as td:
         work_dir = Path(td)
 
-        # שמירה בשמות שהפיילוט מצפה להם (קבצים יחסיים)
-        (work_dir / "feedback report 122025.xlsx").write_bytes(weekly.read())
-        (work_dir / "full feedback report 25112025.xlsx").write_bytes(history.read())
-        (work_dir / "error_code_mapping_final.xlsx").write_bytes(mapping.read())
+        # שמירה בשמות שהפיילוט מצפה להם (קבצים יחסיים).
+        # חשוב: משתמשים ב-save (stream) כדי לא לטעון קבצים גדולים לזיכרון.
+        weekly_path = work_dir / "feedback report 122025.xlsx"
+        history_path = work_dir / "full feedback report 25112025.xlsx"
+        mapping_path = work_dir / "error_code_mapping_final.xlsx"
+
+        weekly.save(str(weekly_path))
+        history.save(str(history_path))
+        mapping.save(str(mapping_path))
+
+        # לוגים ל-Render (יעזור לאבחון אם יש קובץ ענק / איטיות)
+        try:
+            print(
+                "[from-files] saved inputs:",
+                {
+                    "weekly_mb": round(weekly_path.stat().st_size / (1024 * 1024), 2),
+                    "history_mb": round(history_path.stat().st_size / (1024 * 1024), 2),
+                    "mapping_mb": round(mapping_path.stat().st_size / (1024 * 1024), 2),
+                },
+                flush=True,
+            )
+        except Exception:
+            pass
 
         ok, msg, out_path = run_pilot_in_dir(work_dir)
         if not ok or out_path is None:
