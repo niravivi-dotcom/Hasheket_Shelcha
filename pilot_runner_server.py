@@ -1,5 +1,6 @@
 import os
 import io
+import sys
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -19,7 +20,8 @@ def run_pilot() -> tuple[bool, str]:
     """
     מריץ את pilot_engine.py בתיקיית הפרויקט ומחזיר (success, message).
     """
-    cmd = ["py", "-3", str(APP_DIR / "pilot_engine.py")]
+    # cross-platform: נריץ עם ה-python שמריץ את השרת (גם עובד ב-Render/Linux)
+    cmd = [sys.executable, str(PILOT_ENGINE)]
     try:
         completed = subprocess.run(
             cmd,
@@ -219,25 +221,6 @@ if __name__ == "__main__":
     host = os.environ.get("PILOT_RUNNER_HOST", "127.0.0.1")
     port = int(os.environ.get("PILOT_RUNNER_PORT", "8787"))
     app.run(host=host, port=port, debug=False)
-
-import os
-import sys
-import subprocess
-import threading
-from pathlib import Path
-
-from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
-
-
-APP_DIR = Path(__file__).resolve().parent
-OUTFILE = APP_DIR / "Pilot_Results_v2.xlsx"
-
-# הגנה בסיסית: כדי שלא יריצו לך את הפיילוט מכל העולם
-# תגדיר משתנה סביבה PILOT_API_KEY ותעביר אותו ב-header: x-api-key
-API_KEY = os.environ.get("PILOT_API_KEY", "")
-
-# מניעת ריצות במקביל
 _lock = threading.Lock()
 
 app = FastAPI(title="Pilot Runner", version="0.1")
