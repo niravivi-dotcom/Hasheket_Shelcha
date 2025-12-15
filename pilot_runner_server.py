@@ -221,4 +221,3 @@ if __name__ == "__main__":
     host = os.environ.get("PILOT_RUNNER_HOST", "127.0.0.1")
     port = int(os.environ.get("PILOT_RUNNER_PORT", "8787"))
     app.run(host=host, port=port, debug=False)
-*** End Patch: Remove stray FastAPI code (keeps Flask-only server) ***
