@@ -1,6 +1,5 @@
 import os
 import io
-import sys
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -14,15 +13,13 @@ OUTFILE = APP_DIR / "Pilot_Results_v2.xlsx"
 PILOT_ENGINE = APP_DIR / "pilot_engine.py"
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_CONTENT_LENGTH", str(350 * 1024 * 1024)))
 
 
 def run_pilot() -> tuple[bool, str]:
     """
     מריץ את pilot_engine.py בתיקיית הפרויקט ומחזיר (success, message).
     """
-    # cross-platform: נריץ עם ה-python שמריץ את השרת (גם עובד ב-Render/Linux)
-    cmd = [sys.executable, str(PILOT_ENGINE)]
+    cmd = ["py", "-3", str(APP_DIR / "pilot_engine.py")]
     try:
         completed = subprocess.run(
             cmd,
@@ -116,29 +113,10 @@ def run_pilot_from_files():
     with tempfile.TemporaryDirectory(prefix="pilot_run_") as td:
         work_dir = Path(td)
 
-        # שמירה בשמות שהפיילוט מצפה להם (קבצים יחסיים).
-        # חשוב: משתמשים ב-save (stream) כדי לא לטעון קבצים גדולים לזיכרון.
-        weekly_path = work_dir / "feedback report 122025.xlsx"
-        history_path = work_dir / "full feedback report 25112025.xlsx"
-        mapping_path = work_dir / "error_code_mapping_final.xlsx"
-
-        weekly.save(str(weekly_path))
-        history.save(str(history_path))
-        mapping.save(str(mapping_path))
-
-        # לוגים ל-Render (יעזור לאבחון אם יש קובץ ענק / איטיות)
-        try:
-            print(
-                "[from-files] saved inputs:",
-                {
-                    "weekly_mb": round(weekly_path.stat().st_size / (1024 * 1024), 2),
-                    "history_mb": round(history_path.stat().st_size / (1024 * 1024), 2),
-                    "mapping_mb": round(mapping_path.stat().st_size / (1024 * 1024), 2),
-                },
-                flush=True,
-            )
-        except Exception:
-            pass
+        # שמירה בשמות שהפיילוט מצפה להם (קבצים יחסיים)
+        (work_dir / "feedback report 122025.xlsx").write_bytes(weekly.read())
+        (work_dir / "full feedback report 25112025.xlsx").write_bytes(history.read())
+        (work_dir / "error_code_mapping_final.xlsx").write_bytes(mapping.read())
 
         ok, msg, out_path = run_pilot_in_dir(work_dir)
         if not ok or out_path is None:
@@ -159,6 +137,51 @@ def run_pilot_from_files():
         response.headers["X-Pilot-Runner"] = "ok"
         response.headers["X-Pilot-Message"] = msg[:5000]
         return response
+
+
+@app.post("/run-pilot/from-api")
+def run_pilot_from_api():
+    """
+    Endpoint חדש לעיבוד מ-API של דוד (ללא Excel שבועי).
+    קלט (multipart/form-data):
+      - records: שדה טקסט עם JSON array מ-API של דוד
+      - mapping: קובץ XLSX של מיפוי קודי שגיאה (מ-Google Drive)
+    פלט: JSON עם drafts + update_payload
+    """
+    import json as _json
+    import sys as _sys
+    import pandas as _pd
+
+    # --- records ---
+    records_raw = request.form.get("records")
+    if not records_raw:
+        return jsonify({"ok": False, "message": "חסר שדה records בבקשה"}), 400
+    try:
+        records_list = _json.loads(records_raw)
+    except Exception as e:
+        return jsonify({"ok": False, "message": f"שגיאה בפענוח JSON של records: {e}"}), 400
+    if not isinstance(records_list, list):
+        return jsonify({"ok": False, "message": "records חייב להיות JSON array"}), 400
+
+    # --- mapping ---
+    mapping_file = request.files.get("mapping")
+    if mapping_file is None:
+        return jsonify({"ok": False, "message": "חסר קובץ mapping בבקשה"}), 400
+    try:
+        df_map = _pd.read_excel(io.BytesIO(mapping_file.read()))
+        mapping_dict = df_map.set_index("ErrorCodeV4Id").to_dict("index")
+    except Exception as e:
+        return jsonify({"ok": False, "message": f"שגיאה בקריאת mapping: {e}"}), 400
+
+    # --- עיבוד ---
+    try:
+        _sys.path.insert(0, str(APP_DIR))
+        from pilot_engine import process_from_api_records
+        result = process_from_api_records(records_list, mapping_dict)
+    except Exception as e:
+        return jsonify({"ok": False, "message": f"שגיאה בעיבוד: {e}"}), 500
+
+    return jsonify(result)
 
 
 @app.route("/run-pilot/file", methods=["GET", "POST"])
@@ -241,3 +264,90 @@ if __name__ == "__main__":
     host = os.environ.get("PILOT_RUNNER_HOST", "127.0.0.1")
     port = int(os.environ.get("PILOT_RUNNER_PORT", "8787"))
     app.run(host=host, port=port, debug=False)
+import os
+import sys
+import subprocess
+import threading
+from pathlib import Path
+
+from fastapi import FastAPI, Header, HTTPException
+from fastapi.responses import FileResponse, JSONResponse
+
+
+APP_DIR = Path(__file__).resolve().parent
+OUTFILE = APP_DIR / "Pilot_Results_v2.xlsx"
+
+# הגנה בסיסית: כדי שלא יריצו לך את הפיילוט מכל העולם
+# תגדיר משתנה סביבה PILOT_API_KEY ותעביר אותו ב-header: x-api-key
+API_KEY = os.environ.get("PILOT_API_KEY", "")
+
+# מניעת ריצות במקביל
+_lock = threading.Lock()
+
+app = FastAPI(title="Pilot Runner", version="0.1")
+
+
+@app.get("/health")
+def health():
+    return {"ok": True}
+
+
+@app.post("/run-pilot")
+def run_pilot(x_api_key: str | None = Header(default=None)):
+    if not API_KEY:
+        raise HTTPException(
+            status_code=500,
+            detail="Missing server config: set env var PILOT_API_KEY",
+        )
+
+    if not x_api_key or x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not _lock.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="Pilot is already running")
+
+    try:
+        # מריצים את הסקריפט באותה תיקייה כדי שימצא את קבצי האקסל
+        cmd = [sys.executable, "pilot_engine.py"]
+        proc = subprocess.run(
+            cmd,
+            cwd=str(APP_DIR),
+            capture_output=True,
+            text=True,
+        )
+
+        if proc.returncode != 0:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "ok": False,
+                    "error": "pilot_engine_failed",
+                    "returncode": proc.returncode,
+                    "stdout": proc.stdout[-8000:],
+                    "stderr": proc.stderr[-8000:],
+                },
+            )
+
+        if not OUTFILE.exists():
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "ok": False,
+                    "error": "output_missing",
+                    "message": f"Expected output file not found: {OUTFILE}",
+                    "stdout": proc.stdout[-8000:],
+                    "stderr": proc.stderr[-8000:],
+                },
+            )
+
+        # מחזירים את הקובץ עצמו (n8n ייקח אותו כ-binary)
+        return FileResponse(
+            path=str(OUTFILE),
+            filename=OUTFILE.name,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    finally:
+        _lock.release()
+
+
+
