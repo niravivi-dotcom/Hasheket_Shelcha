@@ -2,6 +2,8 @@ import pandas as pd
 import datetime
 import re
 import json
+import io
+import base64
 
 # --- Constants ---
 FILE_WEEKLY = 'sample data.2026.02.24.xlsx'
@@ -71,6 +73,12 @@ COLUMN_KEYWORDS = {
     ],
     'ContactEmail': [
         'contactemail', 'email', 'mail', 'מייל', 'דואל', 'customercontactemail'
+    ],
+    'TikMislaka': [
+        'tikmislaka', 'tik_mislaka', 'tikmislaka', 'תיקמסלקה', 'מסלקה'
+    ],
+    'OriginalFileName': [
+        'originalfilename', 'original_file_name', 'filename', 'שםקובץ', 'שםהקובץ'
     ]
 }
 
@@ -168,7 +176,7 @@ def process_records(records_df, mapping_dict):
     cols = resolve_columns(
         records_df,
         required_keys=['CustomerNumber', 'KodKupa_IdentityNumber', 'KodKupa_IncomeTax', 'MISPAR_MEZAHE_OVED', 'ErrorCodeV4Id', 'UpdateDate'],
-        optional_keys=['MISPAR_MEZAHE_RESHUMA', 'ErrorCodeV4Description', 'LastSuccessfulChodesh', 'CHODESH_MASKORET', 'ContactName', 'ContactEmail', 'FeedbackStatus'],
+        optional_keys=['MISPAR_MEZAHE_RESHUMA', 'ErrorCodeV4Description', 'LastSuccessfulChodesh', 'CHODESH_MASKORET', 'ContactName', 'ContactEmail', 'FeedbackStatus', 'TikMislaka', 'OriginalFileName'],
         source_name="InputData"
     )
     for idx, row in records_df.iterrows():
@@ -205,7 +213,9 @@ def process_records(records_df, mapping_dict):
             'TreatmentStatus': status,
             'ContactName': get_value(row, 'ContactName', cols, ''),
             'ContactEmail': get_value(row, 'ContactEmail', cols, ''),
-            'CHODESH_MASKORET': current_chodesh
+            'CHODESH_MASKORET': current_chodesh,
+            'TikMislaka': get_value(row, 'TikMislaka', cols, ''),
+            'OriginalFileName': get_value(row, 'OriginalFileName', cols, '')
         }
         results.append(res_entry)
         update_payload.append({'MISPAR_MEZAHE_RESHUMA': res_id, 'CalculatedCounter': counter, 'TreatmentStatus': status})
@@ -263,69 +273,112 @@ def main():
     if ENABLE_EXCEL_PIVOT_TABLE: try_create_excel_pivot_table(outfile)
     print(f"Success! Generated Pilot_Results_v2.xlsx and update_payload.json")
 
+def _build_table_html(df, title):
+    """Build an HTML table from a DataFrame subset."""
+    if df.empty:
+        return ""
+    rows_html = ""
+    for _, row in df.iterrows():
+        rows_html += (
+            f"<tr>"
+            f"<td>{row.get('EmployeeID','')}</td>"
+            f"<td>{row.get('KupaID','')}</td>"
+            f"<td>{row.get('ErrorCode','')}</td>"
+            f"<td>{row.get('ErrorDescription','')}</td>"
+            f"</tr>"
+        )
+    return (
+        f"<h3 style='margin-top:20px'>{title}</h3>"
+        f"<table border='1' cellpadding='6' cellspacing='0' "
+        f"style='border-collapse:collapse;direction:rtl;font-size:13px'>"
+        f"<tr style='background:#e8e8e8;font-weight:bold'>"
+        f"<th>מ.ז. עובד</th><th>קוד קופה</th><th>קוד שגיאה</th><th>תיאור שגיאה</th>"
+        f"</tr>"
+        f"{rows_html}"
+        f"</table>"
+    )
+
+
+def _build_excel_attachment(group_df):
+    """Return base64-encoded Excel with full record details."""
+    col_map = {
+        'EmployeeID':      'מ.ז. עובד',
+        'KupaID':          'קוד קופה',
+        'ErrorCode':       'קוד שגיאה',
+        'ErrorDescription':'תיאור שגיאה',
+        'CHODESH_MASKORET':'חודש שכר',
+        'TikMislaka':      'תיק מסלקה',
+        'OriginalFileName':'שם קובץ מקור',
+        'DurationWeeks':   'שבועות פתוח',
+        'Responsibility':  'אחריות',
+        'TreatmentStatus': 'סטטוס טיפול',
+        'MISPAR_MEZAHE_RESHUMA': 'מזהה רשומה',
+    }
+    available = {k: v for k, v in col_map.items() if k in group_df.columns}
+    export_df = group_df[list(available.keys())].copy()
+    export_df.columns = list(available.values())
+
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+        export_df.to_excel(writer, index=False, sheet_name='פרטים')
+    return base64.b64encode(buf.getvalue()).decode('utf-8')
+
+
 def build_email_drafts(output_df):
     """
-    מקבל DataFrame עם תוצאות process_records.
-    מחזיר רשימת טיוטות מייל — אחת לכל קבוצת (מעסיק + קופה + קוד שגיאה + אחריות).
+    One email draft per employer (CustomerNumber).
+    Body: HTML with two tables — counter=1 (new) and counter>=2 (recurring).
+    Attachment: Excel with full details including TikMislaka + OriginalFileName.
+    Skips counter=0 records entirely.
     """
     if output_df.empty:
         return []
 
     drafts = []
-    group_cols = ['CustomerNumber', 'KupaID', 'ErrorCode', 'Responsibility']
-    available = [c for c in group_cols if c in output_df.columns]
 
-    for keys, group in output_df.groupby(available):
-        if not isinstance(keys, tuple):
-            keys = (keys,)
-        key_dict = dict(zip(available, keys))
+    for customer_number, group in output_df.groupby('CustomerNumber'):
+        # Skip counter=0 — no action needed yet
+        group = group[group['DurationWeeks'] >= 1]
+        if group.empty:
+            continue
+
+        table1 = group[group['DurationWeeks'] == 1]   # new issues
+        table2 = group[group['DurationWeeks'] >= 2]   # recurring issues
 
         sample = group.iloc[0]
-        customer_number = str(key_dict.get('CustomerNumber', ''))
-        kupa_id         = str(key_dict.get('KupaID', ''))
-        error_code      = str(key_dict.get('ErrorCode', ''))
-        responsibility  = str(key_dict.get('Responsibility', ''))
+        contact_email = str(sample.get('ContactEmail', '') or '')
+        contact_name  = str(sample.get('ContactName',  '') or '')
 
-        contact_email   = str(sample.get('ContactEmail', '') or '')
-        contact_name    = str(sample.get('ContactName',  '') or '')
-        error_desc      = str(sample.get('ErrorDescription', '') or '')
-        treatment       = str(sample.get('TreatmentStatus', '') or '')
-        duration_weeks  = int(sample['DurationWeeks']) if pd.notna(sample.get('DurationWeeks')) else 0
-
-        unique_employees = group['EmployeeID'].dropna().unique().tolist() if 'EmployeeID' in group.columns else []
-
-        subject = (
-            f"היזון חוזר פנסיוני — "
-            f"מעסיק {customer_number} | קופה {kupa_id} | קוד {error_code}"
-        )
+        total = len(group)
+        subject = f"היזון חוזר פנסיוני — מעסיק {customer_number} | {total} רשומות לטיפול"
 
         greeting = f"שלום {contact_name}," if contact_name else "שלום,"
-        body = "\n".join(filter(None, [
-            greeting,
-            "",
-            f"קוד שגיאה: {error_code}" + (f" — {error_desc}" if error_desc else ""),
-            f"קופה: {kupa_id}",
-            f"אחריות: {responsibility}",
-            f"מספר עובדים מושפעים: {len(unique_employees)}",
-            f"סטטוס טיפול: {treatment}",
-            "",
-            "בברכה,",
-            "צוות השקט שלך",
-        ]))
+        table1_html = _build_table_html(table1, f"שגיאות חדשות ({len(table1)} רשומות)")
+        table2_html = _build_table_html(table2, f"שגיאות חוזרות — דווחו בעבר ({len(table2)} רשומות)")
+
+        body = (
+            f"<div dir='rtl' style='font-family:Arial,sans-serif;direction:rtl'>"
+            f"<p>{greeting}</p>"
+            f"<p>מצורפות רשומות היזון חוזר הדורשות טיפולך עבור מעסיק {customer_number}.</p>"
+            f"{table1_html}"
+            f"{table2_html}"
+            f"<p style='margin-top:20px'>לפרטים מלאים ראה קובץ מצורף.</p>"
+            f"<p>בברכה,<br>צוות השקט שלך</p>"
+            f"</div>"
+        )
+
+        excel_b64 = _build_excel_attachment(group)
 
         drafts.append({
-            "customer_number":       customer_number,
-            "kupa_id":               kupa_id,
-            "error_code":            error_code,
-            "error_description":     error_desc,
-            "responsibility":        responsibility,
-            "contact_email":         contact_email,
-            "contact_name":          contact_name,
-            "treatment_status":      treatment,
-            "duration_weeks":        duration_weeks,
-            "unique_employees_count": len(unique_employees),
-            "subject":               subject,
-            "body":                  body,
+            "customer_number":    str(customer_number),
+            "contact_email":      contact_email,
+            "contact_name":       contact_name,
+            "subject":            subject,
+            "body":               body,
+            "total_records":      total,
+            "new_records":        len(table1),
+            "recurring_records":  len(table2),
+            "excel_attachment":   excel_b64,
         })
 
     return drafts
