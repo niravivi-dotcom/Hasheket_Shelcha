@@ -84,7 +84,7 @@
             { "name": "AccountManagerEmail", "value": "={{ $json.ACCOUNT_MANAGER_EMAIL }}" }
           ]
         },
-        "options": { "timeout": 30000 }
+        "options": { "timeout": 120000 }
       },
       "id": "node-05-get-feedback",
       "name": "HTTP: Get Feedback Data",
