@@ -1,5 +1,6 @@
 import os
 import io
+import base64
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -139,14 +140,27 @@ def run_pilot_from_files():
         return response
 
 
+def _load_service_account():
+    """טוען service account JSON מ-env var GMAIL_SERVICE_ACCOUNT_B64 (base64 מקודד)."""
+    import json as _json
+    raw = os.environ.get('GMAIL_SERVICE_ACCOUNT_B64')
+    if not raw:
+        return None
+    try:
+        return _json.loads(base64.b64decode(raw))
+    except Exception as e:
+        print(f"[WARN] לא הצלחתי לטעון GMAIL_SERVICE_ACCOUNT_B64: {e}")
+        return None
+
+
 @app.post("/run-pilot/from-api")
 def run_pilot_from_api():
     """
-    Endpoint חדש לעיבוד מ-API של דוד (ללא Excel שבועי).
+    Endpoint לעיבוד מ-API של דוד.
     קלט (multipart/form-data):
       - records: שדה טקסט עם JSON array מ-API של דוד
       - mapping: קובץ XLSX של מיפוי קודי שגיאה (מ-Google Drive)
-    פלט: JSON עם drafts + update_payload
+    פלט: JSON עם drafts (תוצאות יצירה ב-Gmail) + update_payload
     """
     import json as _json
     import sys as _sys
@@ -173,11 +187,14 @@ def run_pilot_from_api():
     except Exception as e:
         return jsonify({"ok": False, "message": f"שגיאה בקריאת mapping: {e}"}), 400
 
-    # --- עיבוד ---
+    # --- service account ---
+    service_account_info = _load_service_account()
+
+    # --- עיבוד + יצירת דרפטים ---
     try:
         _sys.path.insert(0, str(APP_DIR))
         from pilot_engine import process_from_api_records
-        result = process_from_api_records(records_list, mapping_dict)
+        result = process_from_api_records(records_list, mapping_dict, service_account_info=service_account_info)
     except Exception as e:
         return jsonify({"ok": False, "message": f"שגיאה בעיבוד: {e}"}), 500
 

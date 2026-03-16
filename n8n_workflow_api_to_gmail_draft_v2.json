@@ -1,0 +1,296 @@
+{
+  "name": "David API → Render Runner → Gmail Drafts (v2)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hasheket-trigger",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "node-01-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-800, 300],
+      "webhookId": "hasheket-trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// *** מלא כאן את הפרטים לפני הפעלה ***\n// ניתן להעתיק מקובץ Auth Tokens (Nir).json\n\nconst REFRESH_TOKEN = 'REPLACE_WITH_REFRESH_TOKEN';\nconst ACCESS_TOKEN  = 'REPLACE_WITH_ACCESS_TOKEN';\nconst CLIENT_ID     = 'REPLACE_WITH_CLIENT_ID';\n\n// הגדרות API\nconst API_BASE   = 'https://portalstage.hspension.co.il/usilenceApi/api';\nconst START_DATE = '2022-01-01';\n\n// ***************************************\n\nreturn [{ json: { REFRESH_TOKEN, ACCESS_TOKEN, CLIENT_ID, API_BASE, START_DATE } }];"
+      },
+      "id": "node-02-config",
+      "name": "Code: Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-600, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.API_BASE }}/auth/token/refresh",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "client_id",      "value": "={{ $json.CLIENT_ID }}" },
+            { "name": "Authorization",  "value": "=Bearer {{ $json.ACCESS_TOKEN }}" },
+            { "name": "api_version",    "value": "1.0" },
+            { "name": "Content-Type",   "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "access_token",  "value": "={{ $json.ACCESS_TOKEN }}" },
+            { "name": "refresh_token", "value": "={{ $json.REFRESH_TOKEN }}" },
+            { "name": "grant_type",    "value": "refresh_token" },
+            { "name": "ApiVersion",    "value": "1.0" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "id": "node-03-refresh",
+      "name": "HTTP: Refresh Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [-400, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp   = $input.first().json;\nconst config = $('Code: Config').first().json;\n\nconst newToken = resp.access_token || resp.AccessToken || resp.token;\nif (!newToken) {\n  throw new Error('לא התקבל access_token מה-refresh. תשובה: ' + JSON.stringify(resp));\n}\n\nreturn [{ json: {\n  access_token: newToken,\n  API_BASE:   config.API_BASE,\n  START_DATE: config.START_DATE\n} }];"
+      },
+      "id": "node-04-extract-token",
+      "name": "Code: Extract Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.API_BASE }}/services/AutomationFeedback/GetFeedbackData",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $json.access_token }}" },
+            { "name": "Content-Type",  "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "StartDate", "value": "={{ $json.START_DATE }}" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "id": "node-05-get-feedback",
+      "name": "HTTP: Get Feedback Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// אוסף את כל הרשומות (n8n מפצל array לפריטים) ומחזיר item אחד עם JSON string\nconst records = $input.all().map(item => item.json);\nreturn [{ json: { records_string: JSON.stringify(records) } }];"
+      },
+      "id": "node-06-stringify",
+      "name": "Code: Stringify Records",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "download",
+        "fileId": "1aHHeD-02dMa3g3ge8BwADdD9Q5zuYGcZ",
+        "options": {}
+      },
+      "id": "node-07-drive-mapping",
+      "name": "Google Drive: Download Mapping",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 1,
+      "position": [200, 500],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "BgjXpVKQYS9oadSp",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "mergeByIndex",
+        "options": {}
+      },
+      "id": "node-08-merge",
+      "name": "Merge: Records + Mapping",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [400, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://pilot-runner-hasheket.onrender.com/run-pilot/from-api",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "records",
+              "value": "={{ $json.records_string }}"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "mapping",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": { "timeout": 120000 }
+      },
+      "id": "node-09-render",
+      "name": "HTTP: Render Runner /from-api",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [600, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\nif (!result.ok) {\n  throw new Error('Render Runner החזיר שגיאה: ' + (result.message || JSON.stringify(result)));\n}\n// מפצל את מערך הרשומות — כל רשומה תשלח POST נפרד ל-SetFeedbackStatus\nreturn result.update_payload.map(item => ({ json: item }));"
+      },
+      "id": "node-12-extract-payload",
+      "name": "Code: Split Update Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 520]
+    },
+    {
+      "parameters": {
+        "batchSize": 50,
+        "options": {}
+      },
+      "id": "node-14-batch",
+      "name": "Split in Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1000, 520]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://portalstage.hspension.co.il/usilenceApi/api/services/AutomationFeedback/SetFeedbackStatus",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('Code: Extract Token').first().json.access_token }}" },
+            { "name": "Content-Type",  "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "MISPAR_MEZAHE_RESHUMA", "value": "={{ $json.MISPAR_MEZAHE_RESHUMA }}" },
+            { "name": "TreatmentStatus",       "value": "={{ $json.TreatmentStatus }}" },
+            { "name": "Counter",               "value": "={{ $json.Counter }}" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "id": "node-13-post-david",
+      "name": "HTTP: POST Update to David",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1200, 520]
+    },
+    {
+      "parameters": {
+        "amount": 500,
+        "unit": "milliseconds"
+      },
+      "id": "node-15-delay",
+      "name": "Wait: Delay",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1400, 520]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[
+        { "node": "Code: Config", "type": "main", "index": 0 }
+      ]]
+    },
+    "Code: Config": {
+      "main": [[
+        { "node": "HTTP: Refresh Token",           "type": "main", "index": 0 },
+        { "node": "Google Drive: Download Mapping", "type": "main", "index": 0 }
+      ]]
+    },
+    "HTTP: Refresh Token": {
+      "main": [[
+        { "node": "Code: Extract Token", "type": "main", "index": 0 }
+      ]]
+    },
+    "Code: Extract Token": {
+      "main": [[
+        { "node": "HTTP: Get Feedback Data", "type": "main", "index": 0 }
+      ]]
+    },
+    "HTTP: Get Feedback Data": {
+      "main": [[
+        { "node": "Code: Stringify Records", "type": "main", "index": 0 }
+      ]]
+    },
+    "Code: Stringify Records": {
+      "main": [[
+        { "node": "Merge: Records + Mapping", "type": "main", "index": 0 }
+      ]]
+    },
+    "Google Drive: Download Mapping": {
+      "main": [[
+        { "node": "Merge: Records + Mapping", "type": "main", "index": 1 }
+      ]]
+    },
+    "Merge: Records + Mapping": {
+      "main": [[
+        { "node": "HTTP: Render Runner /from-api", "type": "main", "index": 0 }
+      ]]
+    },
+    "HTTP: Render Runner /from-api": {
+      "main": [[
+        { "node": "Code: Split Update Payload", "type": "main", "index": 0 }
+      ]]
+    },
+    "Code: Split Update Payload": {
+      "main": [[
+        { "node": "Split in Batches", "type": "main", "index": 0 }
+      ]]
+    },
+    "Split in Batches": {
+      "main": [
+        [{ "node": "HTTP: POST Update to David", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "HTTP: POST Update to David": {
+      "main": [[
+        { "node": "Wait: Delay", "type": "main", "index": 0 }
+      ]]
+    },
+    "Wait: Delay": {
+      "main": [[
+        { "node": "Split in Batches", "type": "main", "index": 0 }
+      ]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "dff6caa0d5f04afb0ca0da403c7d9d8cc9a42e9d2815efd023ee5c342e4312f6"
+  }
+}

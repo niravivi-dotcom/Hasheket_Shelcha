@@ -1,9 +1,16 @@
+import os
 import pandas as pd
 import datetime
 import re
 import json
 import io
 import base64
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+
+GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.compose']
 
 # --- Constants ---
 FILE_WEEKLY = 'sample data.2026.02.24.xlsx'
@@ -79,6 +86,15 @@ COLUMN_KEYWORDS = {
     ],
     'OriginalFileName': [
         'originalfilename', 'original_file_name', 'filename', 'שםקובץ', 'שםהקובץ'
+    ],
+    'Counter': [
+        'counter', 'כמות', 'מונה'
+    ],
+    'AccountManagerEmail': [
+        'customeraccountmanageremail', 'accountmanageremail', 'manageremail'
+    ],
+    'AccountManagerName': [
+        'customeraccountmanagername', 'accountmanagername', 'managername'
     ]
 }
 
@@ -176,7 +192,7 @@ def process_records(records_df, mapping_dict):
     cols = resolve_columns(
         records_df,
         required_keys=['CustomerNumber', 'KodKupa_IdentityNumber', 'KodKupa_IncomeTax', 'MISPAR_MEZAHE_OVED', 'ErrorCodeV4Id', 'UpdateDate'],
-        optional_keys=['MISPAR_MEZAHE_RESHUMA', 'ErrorCodeV4Description', 'LastSuccessfulChodesh', 'CHODESH_MASKORET', 'ContactName', 'ContactEmail', 'FeedbackStatus', 'TikMislaka', 'OriginalFileName'],
+        optional_keys=['MISPAR_MEZAHE_RESHUMA', 'ErrorCodeV4Description', 'LastSuccessfulChodesh', 'CHODESH_MASKORET', 'ContactName', 'ContactEmail', 'FeedbackStatus', 'TikMislaka', 'OriginalFileName', 'Counter', 'AccountManagerEmail', 'AccountManagerName'],
         source_name="InputData"
     )
     for idx, row in records_df.iterrows():
@@ -191,7 +207,14 @@ def process_records(records_df, mapping_dict):
             issues.append({'IssueType': 'MissingErrorMapping', 'CustomerNumber': get_value(row, 'CustomerNumber', cols, ''), 'ErrorCode': err_code})
             map_rule = {'DefaultResponsibility': 'Unknown', 'HasOverrideCondition': False}
         update_date = get_value(row, 'UpdateDate', cols)
-        counter = calculate_duration_weeks_simple(update_date)
+        counter_raw = get_value(row, 'Counter', cols)
+        if pd.notna(counter_raw):
+            try:
+                counter = int(counter_raw)
+            except:
+                counter = calculate_duration_weeks_simple(update_date)
+        else:
+            counter = calculate_duration_weeks_simple(update_date)
         responsibility = map_rule.get('DefaultResponsibility', 'Unknown')
         last_success = get_value(row, 'LastSuccessfulChodesh', cols)
         current_chodesh = get_value(row, 'CHODESH_MASKORET', cols)
@@ -213,12 +236,14 @@ def process_records(records_df, mapping_dict):
             'TreatmentStatus': status,
             'ContactName': get_value(row, 'ContactName', cols, ''),
             'ContactEmail': get_value(row, 'ContactEmail', cols, ''),
+            'AccountManagerEmail': get_value(row, 'AccountManagerEmail', cols, ''),
+            'AccountManagerName': get_value(row, 'AccountManagerName', cols, ''),
             'CHODESH_MASKORET': current_chodesh,
             'TikMislaka': get_value(row, 'TikMislaka', cols, ''),
             'OriginalFileName': get_value(row, 'OriginalFileName', cols, '')
         }
         results.append(res_entry)
-        update_payload.append({'MISPAR_MEZAHE_RESHUMA': res_id, 'CalculatedCounter': counter, 'TreatmentStatus': status})
+        update_payload.append({'MISPAR_MEZAHE_RESHUMA': res_id, 'TreatmentStatus': status, 'Counter': counter})
     return pd.DataFrame(results), update_payload, pd.DataFrame(issues)
 
 # --- Excel Table Helper ---
@@ -346,8 +371,14 @@ def build_email_drafts(output_df):
         table2 = group[group['DurationWeeks'] >= 2]   # recurring issues
 
         sample = group.iloc[0]
-        contact_email = str(sample.get('ContactEmail', '') or '')
-        contact_name  = str(sample.get('ContactName',  '') or '')
+        contact_email         = str(sample.get('ContactEmail',        '') or '')
+        contact_name          = str(sample.get('ContactName',         '') or '')
+        account_manager_email = str(sample.get('AccountManagerEmail', '') or '')
+        account_manager_name  = str(sample.get('AccountManagerName',  '') or '')
+
+        # בסביבת טסט — מנתב את כל המיילים לתיבה אחת
+        test_override = os.environ.get('TEST_EMAIL_OVERRIDE', '')
+        effective_to  = test_override if test_override else contact_email
 
         total = len(group)
         subject = f"היזון חוזר פנסיוני — מעסיק {customer_number} | {total} רשומות לטיפול"
@@ -370,25 +401,88 @@ def build_email_drafts(output_df):
         excel_b64 = _build_excel_attachment(group)
 
         drafts.append({
-            "customer_number":    str(customer_number),
-            "contact_email":      contact_email,
-            "contact_name":       contact_name,
-            "subject":            subject,
-            "body":               body,
-            "total_records":      total,
-            "new_records":        len(table1),
-            "recurring_records":  len(table2),
-            "excel_attachment":   excel_b64,
+            "customer_number":      str(customer_number),
+            "contact_email":        effective_to,
+            "contact_name":         contact_name,
+            "account_manager_email": account_manager_email,
+            "account_manager_name":  account_manager_name,
+            "subject":              subject,
+            "body":                 body,
+            "total_records":        total,
+            "new_records":          len(table1),
+            "recurring_records":    len(table2),
+            "excel_attachment":     excel_b64,
         })
 
     return drafts
 
 
-def process_from_api_records(records_list, mapping_dict):
+def _get_gmail_service(service_account_info, impersonate_email):
+    from google.oauth2 import service_account as sa_module
+    from googleapiclient.discovery import build
+    creds = sa_module.Credentials.from_service_account_info(
+        service_account_info, scopes=GMAIL_SCOPES
+    ).with_subject(impersonate_email)
+    return build('gmail', 'v1', credentials=creds)
+
+
+def _build_mime_message(draft_dict):
+    msg = MIMEMultipart()
+    msg['to']      = draft_dict['contact_email']
+    msg['subject'] = draft_dict['subject']
+    msg.attach(MIMEText(draft_dict['body'], 'html', 'utf-8'))
+
+    excel_bytes = base64.b64decode(draft_dict['excel_attachment'])
+    part = MIMEBase('application', 'vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    part.set_payload(excel_bytes)
+    encoders.encode_base64(part)
+    filename = f"hizon_hazor_{draft_dict['customer_number']}.xlsx"
+    part.add_header('Content-Disposition', 'attachment', filename=filename)
+    msg.attach(part)
+
+    return base64.urlsafe_b64encode(msg.as_bytes()).decode('utf-8')
+
+
+def create_drafts_via_gmail(drafts, service_account_info):
+    results = []
+    for draft in drafts:
+        account_manager_email = draft.get('account_manager_email', '')
+        if not account_manager_email:
+            results.append({
+                'customer_number': draft.get('customer_number'),
+                'ok': False,
+                'error': 'account_manager_email חסר — דרפט לא נוצר'
+            })
+            continue
+        try:
+            service = _get_gmail_service(service_account_info, account_manager_email)
+            raw = _build_mime_message(draft)
+            created = service.users().drafts().create(
+                userId='me', body={'message': {'raw': raw}}
+            ).execute()
+            results.append({
+                'customer_number':       draft.get('customer_number'),
+                'ok':                    True,
+                'draft_id':              created.get('id'),
+                'account_manager_email': account_manager_email,
+                'contact_email':         draft.get('contact_email'),
+                'total_records':         draft.get('total_records'),
+            })
+        except Exception as e:
+            results.append({
+                'customer_number':       draft.get('customer_number'),
+                'account_manager_email': account_manager_email,
+                'ok':                    False,
+                'error':                 str(e)
+            })
+    return results
+
+
+def process_from_api_records(records_list, mapping_dict, service_account_info=None):
     """
     כניסה ראשית לעיבוד מ-API של דוד.
-    מקבל רשימת records (JSON list) ו-mapping_dict.
-    מחזיר dict עם drafts + update_payload.
+    מקבל רשימת records (JSON list), mapping_dict, ואופציונלית service_account_info ליצירת דרפטים ישירות.
+    מחזיר dict עם drafts (תוצאות יצירה או תוכן) + update_payload.
     """
     if not records_list:
         return {"ok": False, "message": "לא התקבלו רשומות", "drafts": [], "update_payload": []}
@@ -398,12 +492,17 @@ def process_from_api_records(records_list, mapping_dict):
 
     drafts = build_email_drafts(output_df)
 
+    if service_account_info:
+        draft_results = create_drafts_via_gmail(drafts, service_account_info)
+    else:
+        draft_results = drafts  # fallback: מחזיר תוכן (לבדיקה מקומית)
+
     return {
-        "ok": True,
+        "ok":              True,
         "total_input":     len(records_list),
         "total_processed": len(output_df),
         "total_drafts":    len(drafts),
-        "drafts":          drafts,
+        "drafts":          draft_results,
         "update_payload":  update_payload,
         "issues":          issues_df.to_dict("records") if not issues_df.empty else [],
     }
