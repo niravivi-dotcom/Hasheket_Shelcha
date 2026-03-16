@@ -90,6 +90,9 @@ COLUMN_KEYWORDS = {
     'Counter': [
         'counter', 'כמות', 'מונה'
     ],
+    'WeeksInStatus': [
+        'onlyonstatuschange_datesdiffinweeks', 'datesdiffinweeks', 'weeksinstatuscalc'
+    ],
     'AccountManagerEmail': [
         'customeraccountmanageremail', 'accountmanageremail', 'manageremail'
     ],
@@ -192,7 +195,7 @@ def process_records(records_df, mapping_dict):
     cols = resolve_columns(
         records_df,
         required_keys=['CustomerNumber', 'KodKupa_IdentityNumber', 'KodKupa_IncomeTax', 'MISPAR_MEZAHE_OVED', 'ErrorCodeV4Id', 'UpdateDate'],
-        optional_keys=['MISPAR_MEZAHE_RESHUMA', 'ErrorCodeV4Description', 'LastSuccessfulChodesh', 'CHODESH_MASKORET', 'ContactName', 'ContactEmail', 'FeedbackStatus', 'TikMislaka', 'OriginalFileName', 'Counter', 'AccountManagerEmail', 'AccountManagerName'],
+        optional_keys=['MISPAR_MEZAHE_RESHUMA', 'ErrorCodeV4Description', 'LastSuccessfulChodesh', 'CHODESH_MASKORET', 'ContactName', 'ContactEmail', 'FeedbackStatus', 'TikMislaka', 'OriginalFileName', 'Counter', 'WeeksInStatus', 'AccountManagerEmail', 'AccountManagerName'],
         source_name="InputData"
     )
     for idx, row in records_df.iterrows():
@@ -207,7 +210,7 @@ def process_records(records_df, mapping_dict):
             issues.append({'IssueType': 'MissingErrorMapping', 'CustomerNumber': get_value(row, 'CustomerNumber', cols, ''), 'ErrorCode': err_code})
             map_rule = {'DefaultResponsibility': 'Unknown', 'HasOverrideCondition': False}
         update_date = get_value(row, 'UpdateDate', cols)
-        counter_raw = get_value(row, 'Counter', cols)
+        counter_raw = get_value(row, 'WeeksInStatus', cols)
         if pd.notna(counter_raw):
             try:
                 counter = int(counter_raw)
