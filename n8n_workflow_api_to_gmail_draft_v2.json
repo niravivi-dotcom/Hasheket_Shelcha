@@ -17,7 +17,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// *** מלא כאן את הפרטים לפני הפעלה ***\n// ניתן להעתיק מקובץ Auth Tokens (Nir).json\n\nconst REFRESH_TOKEN = 'REPLACE_WITH_REFRESH_TOKEN';\nconst ACCESS_TOKEN  = 'REPLACE_WITH_ACCESS_TOKEN';\nconst CLIENT_ID     = 'REPLACE_WITH_CLIENT_ID';\n\n// הגדרות API\nconst API_BASE   = 'https://portalstage.hspension.co.il/usilenceApi/api';\nconst START_DATE = '2022-01-01';\n\n// ***************************************\n\nreturn [{ json: { REFRESH_TOKEN, ACCESS_TOKEN, CLIENT_ID, API_BASE, START_DATE } }];"
+        "jsCode": "// טוקנים נשמרים אוטומטית אחרי כל refresh — אין צורך לעדכן ידנית\nconst staticData = $getWorkflowStaticData('global');\n\nconst REFRESH_TOKEN = staticData.refresh_token || 'NmWaL0dJ2JkglpFauT4dsmJtsGzME3Xxx6taigW4dcakw4Gs0a217BF0ZdYHTvWbAtFGtwEJoyLfMXg2l94ujPLDTdfhuVBRu3FB';\nconst ACCESS_TOKEN  = staticData.access_token  || 'kvxYlA6eSydUw3Hg2hDyRDarFPWTsPa9XiflHk5BD0jbk1kveDDItWavu7Bm2DGzNcePFrrhNal37cQP2fURlclWNZD8PR7QAkgt';\nconst CLIENT_ID     = 'aZ3kLm9PqR2sT7uVxY1bC4dE5fG6hI8jK0nO3pQ4rS5tU6vW7xY8zA9B1C2D3E4F5G6H7I8J9K0LmN1oP2qR3';\n\nconst API_BASE   = 'https://portalstage.hspension.co.il/usilenceApi/api';\nconst START_DATE = '2022-01-01';\n\nreturn [{ json: { REFRESH_TOKEN, ACCESS_TOKEN, CLIENT_ID, API_BASE, START_DATE } }];"
       },
       "id": "node-02-config",
       "name": "Code: Config",
@@ -57,7 +57,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const resp   = $input.first().json;\nconst config = $('Code: Config').first().json;\n\nconst newToken = resp.access_token || resp.AccessToken || resp.token;\nif (!newToken) {\n  throw new Error('לא התקבל access_token מה-refresh. תשובה: ' + JSON.stringify(resp));\n}\n\nreturn [{ json: {\n  access_token: newToken,\n  API_BASE:   config.API_BASE,\n  START_DATE: config.START_DATE\n} }];"
+        "jsCode": "const resp   = $input.first().json;\nconst config = $('Code: Config').first().json;\n\nconst newAccess = resp.access_token || resp.AccessToken || resp.token;\nif (!newAccess) {\n  throw new Error('לא התקבל access_token מה-refresh. תשובה: ' + JSON.stringify(resp));\n}\n\nconst newRefresh = resp.refresh_token || resp.RefreshToken;\nconst staticData = $getWorkflowStaticData('global');\nstaticData.access_token = newAccess;\nif (newRefresh) staticData.refresh_token = newRefresh;\n\nreturn [{ json: {\n  access_token: newAccess,\n  API_BASE:   config.API_BASE,\n  START_DATE: config.START_DATE\n} }];"
       },
       "id": "node-04-extract-token",
       "name": "Code: Extract Token",
