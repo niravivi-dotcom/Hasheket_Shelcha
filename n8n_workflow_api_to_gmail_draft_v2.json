@@ -104,8 +104,14 @@
       "parameters": {
         "authentication": "oAuth2",
         "operation": "download",
-        "fileId": "1aHHeD-02dMa3g3ge8BwADdD9Q5zuYGcZ",
-        "options": {}
+        "fileId": "1dkrqlHosnM-ehExGk9qo4ajjK8JAmh-F",
+        "options": {
+          "googleFileConversion": {
+            "conversion": {
+              "docsToFormat": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            }
+          }
+        }
       },
       "id": "node-07-drive-mapping",
       "name": "Google Drive: Download Mapping",
