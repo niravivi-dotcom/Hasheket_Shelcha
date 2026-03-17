@@ -193,7 +193,7 @@ def run_pilot_from_api():
     top = request.form.get("top", "10000")
     acct_mgr = request.form.get("account_manager_email", "")
 
-    body = {"StartDate": start_date, "top": int(top)}
+    body = {"StartDate": start_date, "top": int(str(top).strip().lstrip('='))}
     if acct_mgr:
         body["AccountManagerEmail"] = acct_mgr
 
