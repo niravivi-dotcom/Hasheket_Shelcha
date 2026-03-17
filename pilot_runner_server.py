@@ -153,6 +153,14 @@ def _load_service_account():
         return None
 
 
+def _check_api_key():
+    """מוודא שה-header X-API-Key תואם ל-API_SECRET_KEY. מחזיר None אם תקין, response אם לא."""
+    secret = os.environ.get("API_SECRET_KEY")
+    if secret and request.headers.get("X-API-Key") != secret:
+        return jsonify({"ok": False, "message": "Unauthorized"}), 401
+    return None
+
+
 @app.post("/run-pilot/from-api")
 def run_pilot_from_api():
     """
@@ -166,6 +174,10 @@ def run_pilot_from_api():
       - mapping: קובץ XLSX של מיפוי קודי שגיאה (מ-Google Drive)
     פלט: JSON עם drafts (תוצאות יצירה ב-Gmail) + update_payload
     """
+    err = _check_api_key()
+    if err:
+        return err
+
     import json as _json
     import sys as _sys
     import pandas as _pd
