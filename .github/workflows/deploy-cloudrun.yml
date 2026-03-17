@@ -7,34 +7,36 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push Docker image
-        run: |
-          docker build -t ghcr.io/${{ github.repository_owner }}/hasheket-runner:${{ github.sha }} .
-          docker push ghcr.io/${{ github.repository_owner }}/hasheket-runner:${{ github.sha }}
 
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker me-west1-docker.pkg.dev --quiet
+
+      - name: Create Artifact Registry repository (if not exists)
+        run: |
+          gcloud artifacts repositories create hasheket-runner \
+            --repository-format=docker \
+            --location=me-west1 \
+            --quiet || true
+
+      - name: Build and push Docker image
+        run: |
+          docker build -t me-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/hasheket-runner/hasheket-runner:${{ github.sha }} .
+          docker push me-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/hasheket-runner/hasheket-runner:${{ github.sha }}
+
       - uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: hasheket-runner
           region: me-west1
-          image: ghcr.io/${{ github.repository_owner }}/hasheket-runner:${{ github.sha }}
+          image: me-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/hasheket-runner/hasheket-runner:${{ github.sha }}
           flags: >
             --memory=2Gi
             --cpu=1
