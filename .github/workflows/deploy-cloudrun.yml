@@ -1,0 +1,34 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Build and push Docker image
+        run: |
+          gcloud auth configure-docker gcr.io --quiet
+          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/hasheket-runner:${{ github.sha }} .
+          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/hasheket-runner:${{ github.sha }}
+
+      - uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: hasheket-runner
+          region: me-west1
+          image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/hasheket-runner:${{ github.sha }}
+          flags: >
+            --memory=2Gi
+            --cpu=1
+            --timeout=3600
+            --min-instances=0
+            --max-instances=1
+            --set-env-vars=GMAIL_SERVICE_ACCOUNT_B64=${{ secrets.GMAIL_SERVICE_ACCOUNT_B64 }}

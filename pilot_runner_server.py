@@ -158,24 +158,47 @@ def run_pilot_from_api():
     """
     Endpoint לעיבוד מ-API של דוד.
     קלט (multipart/form-data):
-      - records: שדה טקסט עם JSON array מ-API של דוד
+      - access_token: Bearer token לקריאת API דוד
+      - api_base: base URL של API דוד
+      - start_date: (optional) תאריך התחלה, ברירת מחדל 2022-01-01
+      - top: (optional) מקסימום רשומות, ברירת מחדל 10000
+      - account_manager_email: (optional) פילטר לפי מנהל תיק
       - mapping: קובץ XLSX של מיפוי קודי שגיאה (מ-Google Drive)
     פלט: JSON עם drafts (תוצאות יצירה ב-Gmail) + update_payload
     """
     import json as _json
     import sys as _sys
     import pandas as _pd
+    import requests as _requests
 
-    # --- records ---
-    records_raw = request.form.get("records")
-    if not records_raw:
-        return jsonify({"ok": False, "message": "חסר שדה records בבקשה"}), 400
+    # --- קריאה ישירה ל-API של דוד ---
+    access_token = request.form.get("access_token")
+    api_base = request.form.get("api_base")
+    if not access_token or not api_base:
+        return jsonify({"ok": False, "message": "חסרים שדות access_token ו/או api_base בבקשה"}), 400
+
+    start_date = request.form.get("start_date", "2022-01-01")
+    top = request.form.get("top", "10000")
+    acct_mgr = request.form.get("account_manager_email", "")
+
+    body = {"StartDate": start_date, "top": int(top)}
+    if acct_mgr:
+        body["AccountManagerEmail"] = acct_mgr
+
     try:
-        records_list = _json.loads(records_raw)
+        resp = _requests.post(
+            f"{api_base}/services/AutomationFeedback/GetFeedbackData",
+            headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
+            json=body,
+            timeout=120,
+        )
+        resp.raise_for_status()
+        records_list = resp.json()
     except Exception as e:
-        return jsonify({"ok": False, "message": f"שגיאה בפענוח JSON של records: {e}"}), 400
+        return jsonify({"ok": False, "message": f"שגיאה בקריאת API של דוד: {e}"}), 502
+
     if not isinstance(records_list, list):
-        return jsonify({"ok": False, "message": "records חייב להיות JSON array"}), 400
+        return jsonify({"ok": False, "message": "תגובת API של דוד אינה JSON array"}), 502
 
     # --- mapping ---
     mapping_file = request.files.get("mapping")
