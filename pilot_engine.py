@@ -5,6 +5,7 @@ import re
 import json
 import io
 import base64
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -446,38 +447,54 @@ def _build_mime_message(draft_dict):
     return base64.urlsafe_b64encode(msg.as_bytes()).decode('utf-8')
 
 
-def create_drafts_via_gmail(drafts, service_account_info):
-    results = []
-    for draft in drafts:
-        account_manager_email = draft.get('account_manager_email', '')
-        if not account_manager_email:
-            results.append({
-                'customer_number': draft.get('customer_number'),
-                'ok': False,
-                'error': 'account_manager_email חסר — דרפט לא נוצר'
-            })
-            continue
-        try:
-            service = _get_gmail_service(service_account_info, account_manager_email)
-            raw = _build_mime_message(draft)
-            created = service.users().drafts().create(
-                userId='me', body={'message': {'raw': raw}}
-            ).execute()
-            results.append({
-                'customer_number':       draft.get('customer_number'),
-                'ok':                    True,
-                'draft_id':              created.get('id'),
-                'account_manager_email': account_manager_email,
-                'contact_email':         draft.get('contact_email'),
-                'total_records':         draft.get('total_records'),
-            })
-        except Exception as e:
-            results.append({
-                'customer_number':       draft.get('customer_number'),
-                'account_manager_email': account_manager_email,
-                'ok':                    False,
-                'error':                 str(e)
-            })
+def _create_single_draft(draft, service_account_info):
+    account_manager_email = draft.get('account_manager_email', '')
+    if not account_manager_email:
+        return {
+            'customer_number': draft.get('customer_number'),
+            'ok': False,
+            'error': 'account_manager_email חסר — דרפט לא נוצר'
+        }
+    try:
+        service = _get_gmail_service(service_account_info, account_manager_email)
+        raw = _build_mime_message(draft)
+        created = service.users().drafts().create(
+            userId='me', body={'message': {'raw': raw}}
+        ).execute()
+        return {
+            'customer_number':       draft.get('customer_number'),
+            'ok':                    True,
+            'draft_id':              created.get('id'),
+            'account_manager_email': account_manager_email,
+            'contact_email':         draft.get('contact_email'),
+            'total_records':         draft.get('total_records'),
+        }
+    except Exception as e:
+        return {
+            'customer_number':       draft.get('customer_number'),
+            'account_manager_email': account_manager_email,
+            'ok':                    False,
+            'error':                 str(e)
+        }
+
+
+def create_drafts_via_gmail(drafts, service_account_info, max_workers=20):
+    results = [None] * len(drafts)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_idx = {
+            executor.submit(_create_single_draft, draft, service_account_info): idx
+            for idx, draft in enumerate(drafts)
+        }
+        for future in as_completed(future_to_idx):
+            idx = future_to_idx[future]
+            try:
+                results[idx] = future.result()
+            except Exception as e:
+                results[idx] = {
+                    'customer_number': drafts[idx].get('customer_number'),
+                    'ok': False,
+                    'error': str(e)
+                }
     return results
 
 
