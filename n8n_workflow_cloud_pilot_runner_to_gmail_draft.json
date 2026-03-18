@@ -15,36 +15,18 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://REPLACE_WITH_YOUR_PUBLIC_RUNNER_URL/run-pilot",
-        "responseFormat": "json",
-        "options": {
-          "timeout": 3600000
-        }
-      },
-      "id": "fd7b25ae-97c6-4f8c-8f8e-d2b1c3c707ac",
-      "name": "HTTP Request (Run Pilot)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [
-        520,
-        240
-      ]
-    },
-    {
-      "parameters": {
-        "method": "GET",
-        "url": "https://REPLACE_WITH_YOUR_PUBLIC_RUNNER_URL/latest/file",
+        "url": "https://REPLACE_WITH_YOUR_PUBLIC_RUNNER_URL/run-pilot/file",
         "responseFormat": "file",
         "options": {
           "timeout": 3600000
         }
       },
-      "id": "9c1f8df8-6d7a-4b1b-a9b1-7b6d44a9c1bf",
-      "name": "HTTP Request (Download XLSX)",
+      "id": "fd7b25ae-97c6-4f8c-8f8e-d2b1c3c707ac",
+      "name": "HTTP Request (Run Pilot + Get XLSX)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        740,
+        520,
         240
       ]
     },
@@ -60,7 +42,7 @@
       "type": "n8n-nodes-base.spreadsheetFile",
       "typeVersion": 1,
       "position": [
-        980,
+        780,
         240
       ]
     },
@@ -73,7 +55,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1240,
+        1040,
         240
       ]
     },
@@ -86,7 +68,7 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 2,
       "position": [
-        1500,
+        1300,
         240
       ]
     },
@@ -104,7 +86,7 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 1,
       "position": [
-        1760,
+        1560,
         240
       ],
       "credentials": {
@@ -120,25 +102,14 @@
       "main": [
         [
           {
-            "node": "HTTP Request (Run Pilot)",
+            "node": "HTTP Request (Run Pilot + Get XLSX)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "HTTP Request (Run Pilot)": {
-      "main": [
-        [
-          {
-            "node": "HTTP Request (Download XLSX)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "HTTP Request (Download XLSX)": {
+    "HTTP Request (Run Pilot + Get XLSX)": {
       "main": [
         [
           {

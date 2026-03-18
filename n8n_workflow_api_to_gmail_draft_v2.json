@@ -1,5 +1,5 @@
 {
-  "name": "David API → Render Runner → Gmail Drafts (v2)",
+  "name": "David API → Runner → Gmail Drafts (v3)",
   "nodes": [
     {
       "parameters": {
@@ -17,7 +17,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// טוקנים נשמרים אוטומטית אחרי כל refresh — אין צורך לעדכן ידנית\nconst staticData = $getWorkflowStaticData('global');\n\nconst REFRESH_TOKEN = staticData.refresh_token || 'y8mC1Zk4pY0aV7N3xD6sQ2fL9uT5WbH1jE8oP4gK7rS0yU2X6I3qA9tM5cF8nJ1vG4dB7eL0hY2zQ6wP9R3sT1uV5xK8aC4mN0D7';\nconst ACCESS_TOKEN  = staticData.access_token  || 'xT4Zp9A2mX7Qf3H0uR5L1y8B6cWnD2E9Jv4sK0gY7oC1q5P3I6t8VxF2aU9rM4N0dS7eH3jL1wG5b8Z6yT2kQ9pA4mX7R0f3H1u5L';\nconst CLIENT_ID     = 'aZ3kLm9PqR2sT7uVxY1bC4dE5fG6hI8jK0nO3pQ4rS5tU6vW7xY8zA9B1C2D3E4F5G6H7I8J9K0LmN1oP2qR3';\n\nconst API_BASE            = 'https://portal.hspension.co.il/usilenceApi/api';\nconst START_DATE          = '2022-01-01';\nconst TOP                 = 10000;\nconst ACCOUNT_MANAGER_EMAIL = 'e.shpigelman@hspension.co.il';\n\nreturn [{ json: { REFRESH_TOKEN, ACCESS_TOKEN, CLIENT_ID, API_BASE, START_DATE, TOP, ACCOUNT_MANAGER_EMAIL } }];"
+        "jsCode": "const CLIENT_ID = 'aZ3kLm9PqR2sT7uVxY1bC4dE5fG6hI8jK0nO3pQ4rS5tU6vW7xY8zA9B1C2D3E4F5G6H7I8J9K0LmN1oP2qR3';\nconst API_BASE            = 'https://portal.hspension.co.il/usilenceApi/api';\nconst START_DATE          = '2022-01-01';\nconst TOP                 = 10000;\nconst ACCOUNT_MANAGER_EMAIL = 'e.shpigelman@hspension.co.il';\n\nreturn [{ json: { CLIENT_ID, API_BASE, START_DATE, TOP, ACCOUNT_MANAGER_EMAIL } }];"
       },
       "id": "node-02-config",
       "name": "Code: Config",
@@ -27,80 +27,28 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{ $json.API_BASE }}/auth/token/refresh",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "client_id",      "value": "={{ $json.CLIENT_ID }}" },
-            { "name": "Authorization",  "value": "=Bearer {{ $json.ACCESS_TOKEN }}" },
-            { "name": "api_version",    "value": "1.0" },
-            { "name": "Content-Type",   "value": "application/json" }
-          ]
+        "workflowId": {
+          "__rl": true,
+          "value": "UXW9G2gStavLTG3T",
+          "mode": "id"
         },
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            { "name": "access_token",  "value": "={{ $json.ACCESS_TOKEN }}" },
-            { "name": "refresh_token", "value": "={{ $json.REFRESH_TOKEN }}" },
-            { "name": "grant_type",    "value": "refresh_token" },
-            { "name": "ApiVersion",    "value": "1.0" }
-          ]
-        },
-        "options": { "timeout": 30000 }
+        "options": {}
       },
-      "id": "node-03-refresh",
-      "name": "HTTP: Refresh Token",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
+      "id": "node-03-get-token",
+      "name": "Execute Workflow: Get Token",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
       "position": [-400, 300]
     },
     {
       "parameters": {
-        "jsCode": "const resp   = $input.first().json;\nconst config = $('Code: Config').first().json;\n\nconst newAccess = resp.access_token || resp.AccessToken || resp.token;\nif (!newAccess) {\n  throw new Error('לא התקבל access_token מה-refresh. תשובה: ' + JSON.stringify(resp));\n}\n\nconst newRefresh = resp.refresh_token || resp.RefreshToken;\nconst staticData = $getWorkflowStaticData('global');\nstaticData.access_token = newAccess;\nif (newRefresh) staticData.refresh_token = newRefresh;\n\nreturn [{ json: {\n  access_token: newAccess,\n  API_BASE:   config.API_BASE,\n  START_DATE: config.START_DATE\n} }];"
+        "jsCode": "const tokenRow = $input.first().json;\nconst config   = $('Code: Config').first().json;\n\nconst access_token = tokenRow.access_token;\nif (!access_token) {\n  throw new Error('לא התקבל access_token מה-Token Manager. תשובה: ' + JSON.stringify(tokenRow));\n}\n\nreturn [{ json: {\n  access_token,\n  API_BASE:              config.API_BASE,\n  START_DATE:            config.START_DATE,\n  TOP:                   config.TOP,\n  ACCOUNT_MANAGER_EMAIL: config.ACCOUNT_MANAGER_EMAIL\n} }];"
       },
       "id": "node-04-extract-token",
       "name": "Code: Extract Token",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [-200, 300]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $json.API_BASE }}/services/AutomationFeedback/GetFeedbackData",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $json.access_token }}" },
-            { "name": "Content-Type",  "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            { "name": "StartDate",           "value": "={{ $json.START_DATE }}" },
-            { "name": "top",                 "value": "={{ $json.TOP }}" },
-            { "name": "AccountManagerEmail", "value": "={{ $json.ACCOUNT_MANAGER_EMAIL }}" }
-          ]
-        },
-        "options": { "timeout": 120000 }
-      },
-      "id": "node-05-get-feedback",
-      "name": "HTTP: Get Feedback Data",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [0, 300]
-    },
-    {
-      "parameters": {
-        "jsCode": "// אוסף את כל הרשומות (n8n מפצל array לפריטים) ומחזיר item אחד עם JSON string\nconst records = $input.all().map(item => item.json);\nreturn [{ json: { records_string: JSON.stringify(records) } }];"
-      },
-      "id": "node-06-stringify",
-      "name": "Code: Stringify Records",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [200, 300]
     },
     {
       "parameters": {
@@ -119,7 +67,7 @@
       "name": "Google Drive: Download Mapping",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 1,
-      "position": [200, 500],
+      "position": [-200, 500],
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "BgjXpVKQYS9oadSp",
@@ -133,10 +81,10 @@
         "options": {}
       },
       "id": "node-08-merge",
-      "name": "Merge: Records + Mapping",
+      "name": "Merge: Token + Mapping",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 2,
-      "position": [400, 400]
+      "position": [50, 400]
     },
     {
       "parameters": {
@@ -147,8 +95,24 @@
         "bodyParameters": {
           "parameters": [
             {
-              "name": "records",
-              "value": "={{ $json.records_string }}"
+              "name": "access_token",
+              "value": "={{ $json.access_token }}"
+            },
+            {
+              "name": "api_base",
+              "value": "={{ $json.API_BASE }}"
+            },
+            {
+              "name": "start_date",
+              "value": "={{ $json.START_DATE }}"
+            },
+            {
+              "name": "top",
+              "value": "={{ $json.TOP }}"
+            },
+            {
+              "name": "account_manager_email",
+              "value": "={{ $json.ACCOUNT_MANAGER_EMAIL }}"
             },
             {
               "parameterType": "formBinaryData",
@@ -157,23 +121,23 @@
             }
           ]
         },
-        "options": { "timeout": 120000 }
+        "options": { "timeout": 300000 }
       },
-      "id": "node-09-render",
-      "name": "HTTP: Render Runner /from-api",
+      "id": "node-09-runner",
+      "name": "HTTP: Runner /from-api",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [600, 400]
+      "position": [250, 400]
     },
     {
       "parameters": {
-        "jsCode": "const result = $input.first().json;\nif (!result.ok) {\n  throw new Error('Render Runner החזיר שגיאה: ' + (result.message || JSON.stringify(result)));\n}\n// מפצל את מערך הרשומות — כל רשומה תשלח POST נפרד ל-SetFeedbackStatus\nreturn result.update_payload.map(item => ({ json: item }));"
+        "jsCode": "const result = $input.first().json;\nif (!result.ok) {\n  throw new Error('Runner החזיר שגיאה: ' + (result.message || JSON.stringify(result)));\n}\n// מפצל את מערך הרשומות — כל רשומה תשלח POST נפרד ל-SetFeedbackStatus\nreturn result.update_payload.map(item => ({ json: item }));"
       },
       "id": "node-12-extract-payload",
       "name": "Code: Split Update Payload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [800, 520]
+      "position": [450, 400]
     },
     {
       "parameters": {
@@ -184,7 +148,7 @@
       "name": "Split in Batches",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [1000, 520]
+      "position": [650, 400]
     },
     {
       "parameters": {
@@ -211,7 +175,7 @@
       "name": "HTTP: POST Update to David",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1200, 520]
+      "position": [850, 400]
     },
     {
       "parameters": {
@@ -222,7 +186,7 @@
       "name": "Wait: Delay",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
-      "position": [1400, 520]
+      "position": [1050, 400]
     }
   ],
   "connections": {
@@ -233,41 +197,31 @@
     },
     "Code: Config": {
       "main": [[
-        { "node": "HTTP: Refresh Token",           "type": "main", "index": 0 },
-        { "node": "Google Drive: Download Mapping", "type": "main", "index": 0 }
+        { "node": "Execute Workflow: Get Token",      "type": "main", "index": 0 },
+        { "node": "Google Drive: Download Mapping",   "type": "main", "index": 0 }
       ]]
     },
-    "HTTP: Refresh Token": {
+    "Execute Workflow: Get Token": {
       "main": [[
         { "node": "Code: Extract Token", "type": "main", "index": 0 }
       ]]
     },
     "Code: Extract Token": {
       "main": [[
-        { "node": "HTTP: Get Feedback Data", "type": "main", "index": 0 }
-      ]]
-    },
-    "HTTP: Get Feedback Data": {
-      "main": [[
-        { "node": "Code: Stringify Records", "type": "main", "index": 0 }
-      ]]
-    },
-    "Code: Stringify Records": {
-      "main": [[
-        { "node": "Merge: Records + Mapping", "type": "main", "index": 0 }
+        { "node": "Merge: Token + Mapping", "type": "main", "index": 0 }
       ]]
     },
     "Google Drive: Download Mapping": {
       "main": [[
-        { "node": "Merge: Records + Mapping", "type": "main", "index": 1 }
+        { "node": "Merge: Token + Mapping", "type": "main", "index": 1 }
       ]]
     },
-    "Merge: Records + Mapping": {
+    "Merge: Token + Mapping": {
       "main": [[
-        { "node": "HTTP: Render Runner /from-api", "type": "main", "index": 0 }
+        { "node": "HTTP: Runner /from-api", "type": "main", "index": 0 }
       ]]
     },
-    "HTTP: Render Runner /from-api": {
+    "HTTP: Runner /from-api": {
       "main": [[
         { "node": "Code: Split Update Payload", "type": "main", "index": 0 }
       ]]

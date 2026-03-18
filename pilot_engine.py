@@ -466,14 +466,14 @@ def _create_single_draft(draft, service_account_info):
             'customer_number':       draft.get('customer_number'),
             'ok':                    True,
             'draft_id':              created.get('id'),
-            'account_manager_email': account_manager_email,
+            'account_manager_email': impersonate_email,
             'contact_email':         draft.get('contact_email'),
             'total_records':         draft.get('total_records'),
         }
     except Exception as e:
         return {
             'customer_number':       draft.get('customer_number'),
-            'account_manager_email': account_manager_email,
+            'account_manager_email': impersonate_email,
             'ok':                    False,
             'error':                 str(e)
         }

@@ -12,3 +12,7 @@ Pilot_Results_v2.xlsx
 *.xlsx
 *.xls
 
+# Secrets & credentials
+*.json
+!n8n_workflow_*.json
+
