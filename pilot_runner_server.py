@@ -184,16 +184,16 @@ def run_pilot_from_api():
     import requests as _requests
 
     # --- קריאה ישירה ל-API של דוד ---
-    access_token = request.form.get("access_token")
-    api_base = request.form.get("api_base")
+    access_token = request.form.get("access_token", "").strip().lstrip("=")
+    api_base = request.form.get("api_base", "").strip().lstrip("=")
     if not access_token or not api_base:
         return jsonify({"ok": False, "message": "חסרים שדות access_token ו/או api_base בבקשה"}), 400
 
-    start_date = request.form.get("start_date", "2022-01-01")
-    top = request.form.get("top", "10000")
-    acct_mgr = request.form.get("account_manager_email", "")
+    start_date = request.form.get("start_date", "2022-01-01").strip().lstrip("=")
+    top = request.form.get("top", "10000").strip().lstrip("=")
+    acct_mgr = request.form.get("account_manager_email", "").strip().lstrip("=")
 
-    body = {"StartDate": start_date, "top": int(str(top).strip().lstrip('='))}
+    body = {"StartDate": start_date, "top": int(top)}
     if acct_mgr:
         body["AccountManagerEmail"] = acct_mgr
 
