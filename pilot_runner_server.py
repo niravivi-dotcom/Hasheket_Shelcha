@@ -229,7 +229,7 @@ def run_pilot_from_api():
     try:
         _sys.path.insert(0, str(APP_DIR))
         from pilot_engine import process_from_api_records
-        result = process_from_api_records(records_list, mapping_dict, service_account_info=service_account_info)
+        result = process_from_api_records(records_list, mapping_dict, service_account_info=service_account_info, default_account_manager_email=acct_mgr)
     except Exception as e:
         return jsonify({"ok": False, "message": f"שגיאה בעיבוד: {e}"}), 500
 

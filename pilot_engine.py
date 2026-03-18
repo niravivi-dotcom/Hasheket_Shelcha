@@ -448,15 +448,16 @@ def _build_mime_message(draft_dict):
 
 
 def _create_single_draft(draft, service_account_info):
-    account_manager_email = draft.get('account_manager_email', '')
-    if not account_manager_email:
+    # לשלב טסטים: אם מוגדר TEST_GMAIL_IMPERSONATE — יוצרים טיוטות בתיבה הזו
+    impersonate_email = os.environ.get('TEST_GMAIL_IMPERSONATE', '') or draft.get('account_manager_email', '')
+    if not impersonate_email:
         return {
             'customer_number': draft.get('customer_number'),
             'ok': False,
             'error': 'account_manager_email חסר — דרפט לא נוצר'
         }
     try:
-        service = _get_gmail_service(service_account_info, account_manager_email)
+        service = _get_gmail_service(service_account_info, impersonate_email)
         raw = _build_mime_message(draft)
         created = service.users().drafts().create(
             userId='me', body={'message': {'raw': raw}}
@@ -498,7 +499,7 @@ def create_drafts_via_gmail(drafts, service_account_info, max_workers=20):
     return results
 
 
-def process_from_api_records(records_list, mapping_dict, service_account_info=None):
+def process_from_api_records(records_list, mapping_dict, service_account_info=None, default_account_manager_email=''):
     """
     כניסה ראשית לעיבוד מ-API של דוד.
     מקבל רשימת records (JSON list), mapping_dict, ואופציונלית service_account_info ליצירת דרפטים ישירות.
@@ -509,6 +510,12 @@ def process_from_api_records(records_list, mapping_dict, service_account_info=No
 
     df_input = pd.DataFrame(records_list)
     output_df, update_payload, issues_df = process_records(df_input, mapping_dict)
+
+    # fallback: אם הרשומות לא מכילות AccountManagerEmail — משתמשים בברירת המחדל
+    if default_account_manager_email and 'AccountManagerEmail' in output_df.columns:
+        output_df['AccountManagerEmail'] = output_df['AccountManagerEmail'].replace('', default_account_manager_email).fillna(default_account_manager_email)
+    elif default_account_manager_email:
+        output_df['AccountManagerEmail'] = default_account_manager_email
 
     drafts = build_email_drafts(output_df)
 
