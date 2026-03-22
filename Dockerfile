@@ -18,6 +18,7 @@ COPY record_grouper.py         /app/record_grouper.py
 COPY email_builder.py          /app/email_builder.py
 COPY gmail_sender.py           /app/gmail_sender.py
 COPY payload_builder.py        /app/payload_builder.py
+COPY report_builder.py         /app/report_builder.py
 
 ENV PORT=8080
 EXPOSE 8080
