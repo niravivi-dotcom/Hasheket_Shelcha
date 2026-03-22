@@ -87,11 +87,12 @@ def _process_one(group, email_content, impersonate, service_account_info):
     """יוצר draft אחד ב-Gmail. מחזיר SendResult."""
     to_email = email_content.get("to_email")
 
-    if not to_email:
-        return _error_result(group, f"to_email חסר לקבוצה {group.get('group_key')}")
-
     if not impersonate:
         return _error_result(group, "impersonate_email חסר — לא ניתן ליצור draft")
+
+    # בסביבת בדיקה: אם אין to_email אמיתי (stub), שולח ל-impersonate עצמו
+    if not to_email:
+        to_email = impersonate
 
     try:
         service = _get_gmail_service(service_account_info, impersonate)

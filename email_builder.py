@@ -129,8 +129,8 @@ def _build_mosadi_1(group, mapping):
     return {
         "subject":     subject,
         "body_html":   body_html,
-        "to_email":    meta.get("to_role"),      # stub — יגיע מנמענים מוסדיים
-        "cc_email":    meta.get("cc_role"),
+        "to_email":    None,   # stub — כתובת גוף מוסדי תגיע מדוד בעתיד
+        "cc_email":    None,
         "attachments": [],
     }
 
@@ -161,8 +161,8 @@ def _build_mosadi_2(group, mapping):
     return {
         "subject":     subject,
         "body_html":   body_html,
-        "to_email":    meta.get("to_role"),
-        "cc_email":    meta.get("cc_role"),
+        "to_email":    None,   # stub — כתובת גוף מוסדי תגיע מדוד בעתיד
+        "cc_email":    None,
         "attachments": [],
     }
 
