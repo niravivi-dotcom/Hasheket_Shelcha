@@ -90,8 +90,8 @@ def _process_one(group, email_content, impersonate, service_account_info):
     if not impersonate:
         return _error_result(group, "impersonate_email חסר — לא ניתן ליצור draft")
 
-    # בסביבת בדיקה: אם אין to_email אמיתי (stub), שולח ל-impersonate עצמו
-    if not to_email:
+    # אם to_email חסר או לא תקין (לא כתובת מייל) — fallback ל-impersonate
+    if not to_email or "@" not in str(to_email):
         to_email = impersonate
 
     try:
