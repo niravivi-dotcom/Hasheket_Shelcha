@@ -23,11 +23,12 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 
 
-def build_run_report(groups, send_results, skipped_records=None, run_date=None):
+def build_run_report(groups, send_results, skipped_records=None, raw_records=None, run_date=None):
     """
     groups          : מ-group_records()
     send_results    : מ-send_all_groups()  [רשימת SendResult dicts]
     skipped_records : רשימת (record, reason) שנסוננו ב-classify_all (optional)
+    raw_records     : רשימת הרשומות הגולמיות מה-API (optional) — לגיליון מעקב pipeline
     run_date        : datetime או None → now()
 
     מחזיר bytes של Excel.
@@ -119,9 +120,11 @@ def build_run_report(groups, send_results, skipped_records=None, run_date=None):
     wb = load_workbook(bio)
     _style_workbook(wb, run_date)
     _build_dashboard_sheet(wb, groups, skipped_records or [], run_date)
+    if raw_records:
+        _build_pipeline_sheet(wb, raw_records, groups, skipped_records or [], draft_map)
 
     # הזזת דשבורד להיות הגיליון הראשון
-    wb.move_sheet("דשבורד", offset=-len(wb.sheetnames) + 1)
+    wb.move_sheet("דשבורד", offset=-wb.sheetnames.index("דשבורד"))
 
     out = io.BytesIO()
     wb.save(out)
@@ -302,3 +305,109 @@ def _build_dashboard_sheet(wb, groups, skipped_records, run_date):
         for i, v in enumerate(row_vals, 1):
             _dcell(ws, row, i, v)
         row += 1
+
+
+def _build_pipeline_sheet(wb, raw_records, groups, skipped_records, draft_map):
+    """גיליון מעקב pipeline — שורה לכל רשומה גולמית מה-API עם גורל הרשומה."""
+
+    # --- בניית lookups ---
+    # record_id → (classified_record, group_key, draft_id)
+    classified_lookup = {}
+    for g in groups:
+        gk  = g["group_key"]
+        fmt = g["email_format"]
+        sr  = draft_map.get(gk, {})
+        did = sr.get("draft_id")
+        for r in g["records"]:
+            classified_lookup[r["record_id"]] = {
+                "email_format":  fmt,
+                "responsibility": r.get("responsibility"),
+                "group_key":     gk,
+                "draft_id":      did,
+                "routing_path":  r.get("routing_path"),
+            }
+
+    # record_id → reason (סונן)
+    skipped_lookup = {}
+    for raw_rec, reason in skipped_records:
+        rid = raw_rec.get("MISPAR_MEZAHE_RESHUMA") or raw_rec.get("record_id")
+        if rid:
+            skipped_lookup[str(rid)] = reason or "סונן"
+
+    # --- בניית שורות ---
+    rows = []
+    for raw in raw_records:
+        rid = str(raw.get("MISPAR_MEZAHE_RESHUMA") or "")
+        cl  = classified_lookup.get(rid)
+        sk  = skipped_lookup.get(rid)
+
+        if cl:
+            action = "טופל"
+            reason = ""
+            fmt    = cl["email_format"]
+            resp   = cl["responsibility"]
+            gk     = cl["group_key"]
+            did    = cl["draft_id"]
+            path   = cl["routing_path"]
+        elif sk is not None:
+            action = "סונן"
+            reason = sk
+            fmt = resp = gk = did = path = ""
+        else:
+            action = "לא ידוע"
+            reason = fmt = resp = gk = did = path = ""
+
+        rows.append({
+            "MISPAR_MEZAHE_RESHUMA":              rid,
+            "CustomerNumber":                     raw.get("CustomerNumber"),
+            "CustomerName":                       raw.get("CustomerName"),
+            "ErrorCodeV4Id":                      raw.get("ErrorCodeV4Id"),
+            "StatusDescription":                  raw.get("StatusDescription"),
+            "OnlyOnStatusChange_DatesDiffInWeeks": raw.get("OnlyOnStatusChange_DatesDiffInWeeks"),
+            "LastPositive_CHODESH_MASKORET":      raw.get("LastPositive_CHODESH_MASKORET"),
+            "FundInstitutionName":                raw.get("FundInstitutionName"),
+            "CHODESH_MASKORET":                   raw.get("CHODESH_MASKORET"),
+            "פעולה":         action,
+            "סיבת סינון":    reason,
+            "email_format":  fmt,
+            "אחריות":        resp,
+            "group_key":     gk,
+            "draft_id":      did,
+            "routing_path":  path,
+        })
+
+    ws_name = "מעקב pipeline"
+    df = pd.DataFrame(rows)
+
+    # כתיבה זמנית דרך BytesIO כדי להוסיף לחוברת הקיימת
+    tmp = io.BytesIO()
+    with pd.ExcelWriter(tmp, engine="openpyxl") as w:
+        df.to_excel(w, sheet_name=ws_name, index=False)
+    tmp.seek(0)
+    src_wb = load_workbook(tmp)
+    src_ws = src_wb[ws_name]
+
+    # העברת הגיליון לחוברת הראשית
+    tgt_ws = wb.create_sheet(ws_name)
+    tgt_ws.sheet_view.rightToLeft = True
+    for row in src_ws.iter_rows(values_only=True):
+        tgt_ws.append(list(row))
+
+    # עיצוב בסיסי
+    H_FILL = PatternFill("solid", start_color="1F4E79", end_color="1F4E79")
+    H_FONT = Font(bold=True, color="FFFFFF", name="Arial", size=10)
+    D_FONT = Font(name="Arial", size=10)
+    RIGHT  = Alignment(horizontal="right", vertical="center")
+    CENTER = Alignment(horizontal="center", vertical="center")
+
+    for cell in tgt_ws[1]:
+        cell.font = H_FONT; cell.fill = H_FILL; cell.alignment = CENTER
+    for row in tgt_ws.iter_rows(min_row=2):
+        for cell in row:
+            cell.font = D_FONT; cell.alignment = RIGHT
+
+    for col_cells in tgt_ws.columns:
+        max_len = max((len(str(c.value or "")) for c in col_cells), default=10)
+        tgt_ws.column_dimensions[get_column_letter(col_cells[0].column)].width = min(max_len + 4, 40)
+
+    tgt_ws.freeze_panes = "A2"

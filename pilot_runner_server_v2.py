@@ -206,7 +206,7 @@ def run_pilot_from_api_v2():
 
     # --- דו"ח סיכום ---
     try:
-        report_bytes = build_run_report(groups, send_results, skipped_records=skipped_list, run_date=datetime.utcnow())
+        report_bytes = build_run_report(groups, send_results, skipped_records=skipped_list, raw_records=records_list, run_date=datetime.utcnow())
         import base64 as _b64
         report_b64 = _b64.b64encode(report_bytes).decode("utf-8")
     except Exception as e:
