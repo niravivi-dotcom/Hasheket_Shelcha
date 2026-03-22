@@ -133,23 +133,27 @@ def classify_record(record, mapping):
     # רשומה מבוטלת — לא לעבד
     status_desc = _get(record, FIELD_STATUS_DESC, "")
     if status_desc and "מבוטלת" in str(status_desc):
-        return None
+        return None, "רשומה מבוטלת"
 
     # שבוע 0 — שגיאה חדשה, אין פעולה
     try:
         if counter is not None and int(float(counter)) == 0:
-            return None
+            return None, "Counter=0 (שגיאה חדשה)"
     except (ValueError, TypeError):
         pass
 
     # קוד שגיאה
     raw_code = _get(record, FIELD_ERROR_CODE)
     if raw_code is None:
-        return None
+        return None, "קוד שגיאה חסר"
     try:
         error_code = int(float(raw_code))
     except (ValueError, TypeError):
-        return None
+        return None, "קוד שגיאה לא תקין"
+
+    # קודים מוחרגים במפורש
+    if error_code in (1, 2):
+        return None, f"קוד שגיאה {error_code} — מוחרג"
 
     # חיפוש בקובץ מיפוי
     rule = mapping["error_codes"].get(error_code)
@@ -158,11 +162,11 @@ def classify_record(record, mapping):
         return _build_result(record, record_id, customer, error_code, counter, rule=None,
                               responsibility=RESP_CASE_MANAGER,
                               email_format=FORMAT_CASE_MGR,
-                              recipients={"to_role": "מנהלת תיק", "cc_role": None, "path": "unknown_code"})
+                              recipients={"to_role": "מנהלת תיק", "cc_role": None, "path": "unknown_code"}), None
 
     # קוד מוחרג
     if rule.get("excluded", False):
-        return None
+        return None, f"קוד שגיאה {error_code} — מוחרג בקובץ מיפוי"
 
     email_format   = rule.get("email_format", FORMAT_EXCLUDED)
     responsibility = rule.get("responsibility", RESP_CASE_MANAGER)
@@ -186,7 +190,7 @@ def classify_record(record, mapping):
             responsibility = RESPONSIBILITY_MAP.get(to_role, responsibility)
             email_format   = _infer_format_from_role(to_role, email_format)
     else:
-        # אין תנאי ואין override — DefaultResponsibility ישירות
+        # אין תנאי ואין override — DefaultResponסibility ישירות
         recipients = {
             "to_role": rule.get("responsibility_he"),
             "cc_role": rule.get("cc_responsibility"),
@@ -194,7 +198,7 @@ def classify_record(record, mapping):
         }
 
     return _build_result(record, record_id, customer, error_code, counter, rule,
-                         responsibility, email_format, recipients)
+                         responsibility, email_format, recipients), None
 
 
 def _infer_format_from_role(role, default_format):
@@ -259,14 +263,14 @@ def _build_result(record, record_id, customer, error_code, counter,
 def classify_all(records, mapping):
     """
     מסווג רשימת רשומות.
-    מחזיר (classified_list, skipped_count)
+    מחזיר (classified_list, skipped_list) כאשר skipped_list = [(record, reason), ...]
     """
     classified = []
-    skipped = 0
+    skipped = []
     for rec in records:
-        result = classify_record(rec, mapping)
+        result, reason = classify_record(rec, mapping)
         if result is None:
-            skipped += 1
+            skipped.append((rec, reason or "סונן"))
         else:
             classified.append(result)
     return classified, skipped

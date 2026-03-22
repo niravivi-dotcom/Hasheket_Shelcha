@@ -160,11 +160,11 @@ def run_pilot_from_api_v2():
 
     # --- שלב 3: classify ---
     try:
-        classified, skipped = classify_all(records_list, mapping)
+        classified, skipped_list = classify_all(records_list, mapping)
     except Exception as e:
         return jsonify({"ok": False, "message": f"שגיאה בסיווג רשומות: {e}"}), 500
 
-    print(f"[v2] classified={len(classified)} skipped={skipped}")
+    print(f"[v2] classified={len(classified)} skipped={len(skipped_list)}")
 
     # --- שלב 4: group ---
     try:
@@ -206,7 +206,7 @@ def run_pilot_from_api_v2():
 
     # --- דו"ח סיכום ---
     try:
-        report_bytes = build_run_report(groups, send_results, run_date=datetime.utcnow())
+        report_bytes = build_run_report(groups, send_results, skipped_records=skipped_list, run_date=datetime.utcnow())
         import base64 as _b64
         report_b64 = _b64.b64encode(report_bytes).decode("utf-8")
     except Exception as e:
@@ -219,7 +219,7 @@ def run_pilot_from_api_v2():
         "stats": {
             "fetched":        fetched,
             "classified":     len(classified),
-            "skipped":        skipped,
+            "skipped":        len(skipped_list),
             "groups":         len(groups),
             "emails_ok":      gmail_summary["ok"],
             "emails_fail":    gmail_summary["failed"],
