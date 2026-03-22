@@ -135,10 +135,11 @@ def classify_record(record, mapping):
     if status_desc and "מבוטלת" in str(status_desc):
         return None, "רשומה מבוטלת"
 
-    # שבוע 0 — שגיאה חדשה, אין פעולה
+    # counter < 1 (כולל null) — שגיאה חדשה או לא רלוונטית, אין פעולה
     try:
-        if counter is not None and int(float(counter)) == 0:
-            return None, "Counter=0 (שגיאה חדשה)"
+        c_val = int(float(counter)) if counter is not None else 0
+        if c_val < 1:
+            return None, f"Counter={c_val} (פחות מ-1)"
     except (ValueError, TypeError):
         pass
 
