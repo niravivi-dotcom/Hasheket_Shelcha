@@ -1,0 +1,264 @@
+"""
+record_classifier.py
+--------------------
+מסווג רשומה בודדת מה-API של דוד לפי קובץ המיפוי.
+מחזיר: אחריות, פורמט מייל, נמענים (תפקידים), האם לעבד.
+
+לוגיקת ניתוב:
+  has_previous_positive = LastPositive_CHODESH_MASKORET IS NOT NULL
+  ┌─ TRUE  → DefaultResponsibility path (מוסדי)
+  └─ FALSE → Override path:
+       1. OverrideMailRecipients (אם יש כתובת מייל לתפקיד הזה ברשומה)
+       2. OverrideMailRecipients 2 (fallback)
+       3. Default (fallback אחרון)
+"""
+
+import pandas as pd
+from mapping_loader import (
+    FORMAT_EXCLUDED, FORMAT_CASE_MGR,
+    RESP_CASE_MANAGER, RESPONSIBILITY_MAP,
+    PENSION_FUND_PRODUCT_CODE,  # stub
+)
+
+# שדות API מדוד — קיימים עכשיו
+FIELD_RECORD_ID        = "MISPAR_MEZAHE_RESHUMA"
+FIELD_CUSTOMER         = "CustomerNumber"
+FIELD_ERROR_CODE       = "ErrorCodeV4Id"
+FIELD_COUNTER          = "Counter"
+FIELD_FEEDBACK_STATUS  = "FeedbackStatus"
+FIELD_LAST_POSITIVE    = "LastPositive_CHODESH_MASKORET"
+FIELD_CHODESH          = "CHODESH_MASKORET"
+FIELD_CONTACT_EMAIL    = "CustomerContactEmail"
+FIELD_TIK_MISLAKA      = "TikMislaka"
+FIELD_ORIGINAL_FILE    = "OriginalFileName"
+FIELD_FUND_NAME        = "FundInstitutionName"
+FIELD_FUND_ID          = "FundInstitutionIdentityNumber"
+
+# TODO: שדות שיגיעו מדוד בעתיד
+FIELD_FULL_NAME        = "FullName"           # שם מלא עובד — ממתין לדוד
+FIELD_AGENT_EMAIL      = "AgentEmail"         # מייל סוכן — ממתין לדוד
+FIELD_ACCOUNTANT_EMAIL = "AccountantEmail"    # מייל רו"ח — ממתין לדוד
+FIELD_CONTACT1_EMAIL   = "Contact1Email"      # איש קשר 1 מעסיק — ממתין לדוד
+FIELD_CONTACT2_EMAIL   = "Contact2Email"      # איש קשר 2 מעסיק — ממתין לדוד
+FIELD_PRODUCT_TYPE     = "ProductTypeCode"    # קוד סוג מוצר — ממתין לדוד
+FIELD_EMPLOYER_NAME    = "EmployerName"       # שם מעסיק — ממתין לדוד
+FIELD_EMPLOYEE_ID      = "MISPAR_MEZAHE_OVED" # מ.ז. עובד
+
+# מיפוי: ערך תפקיד בקובץ → שדה API המכיל את הכתובת
+ROLE_TO_FIELD = {
+    "סוכן":                FIELD_AGENT_EMAIL,
+    'רו"ח':                FIELD_ACCOUNTANT_EMAIL,
+    "איש קשר 1 מעסיק":    FIELD_CONTACT1_EMAIL,
+    "איש קשר 2 מעסיק":    FIELD_CONTACT2_EMAIL,
+    "מנהלת תיק":           None,   # נפתר ברמת ה-runner לפי מנהלת התיק האמיתית
+}
+
+
+def _get(record, field, default=None):
+    val = record.get(field, default)
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return default
+    return val
+
+
+def _has_value(record, field):
+    """True אם השדה קיים ברשומה עם ערך לא-ריק."""
+    val = _get(record, field)
+    return val is not None and str(val).strip() not in ("", "nan", "None")
+
+
+def _check_pre_mail_condition(record, rule):
+    """
+    בודק את תנאי PreMailCondition לרשומה.
+    מחזיר True אם התנאי מתקיים (→ path מוסדי), False אחרת.
+    None אם אין תנאי רלוונטי לקוד הזה.
+    """
+    # תנאי 1: LastPositive_CHODESH_MASKORET — כבר קיים ב-API
+    if _has_value(record, FIELD_LAST_POSITIVE):
+        return True
+
+    # TODO תנאי 2: קוד סוג מוצר = קרן פנסיה — ממתין לדוד
+    # if PENSION_FUND_PRODUCT_CODE is not None:
+    #     product_code = _get(record, FIELD_PRODUCT_TYPE)
+    #     if product_code == PENSION_FUND_PRODUCT_CODE:
+    #         return True
+
+    return False
+
+
+def _resolve_recipients(record, rule):
+    """
+    קובע נמענים (תפקידים, לא כתובות סופיות) לפי לוגיקת Override.
+    מחזיר: { "to_role": str, "cc_role": str, "path": str }
+    """
+    override1 = rule.get("override_recipients")
+    cc1       = rule.get("cc_override_1")
+    override2 = rule.get("override_recipients_2")
+    cc2       = rule.get("cc_override_2")
+
+    # Override 1: תפקיד שקיים ברשומה
+    if override1 and override1 in ROLE_TO_FIELD:
+        field = ROLE_TO_FIELD[override1]
+        if field and _has_value(record, field):
+            return {"to_role": override1, "cc_role": cc1, "path": "override_1"}
+
+    # Override 2: fallback
+    if override2 and override2 in ROLE_TO_FIELD:
+        field = ROLE_TO_FIELD[override2]
+        if field and _has_value(record, field):
+            return {"to_role": override2, "cc_role": cc2, "path": "override_2"}
+
+    # Default: DefaultResponsibility
+    return {
+        "to_role": rule.get("responsibility_he"),
+        "cc_role": rule.get("cc_responsibility"),
+        "path":    "default",
+    }
+
+
+def classify_record(record, mapping):
+    """
+    מסווג רשומה בודדת.
+
+    record  : dict (שורה מ-API של דוד)
+    mapping : תוצאת load_mapping()
+
+    מחזיר ClassifiedRecord dict, או None אם הרשומה מוחרגת / לא לעיבוד.
+    """
+    record_id     = _get(record, FIELD_RECORD_ID, f"UNKNOWN_{id(record)}")
+    customer      = _get(record, FIELD_CUSTOMER)
+    counter       = _get(record, FIELD_COUNTER, 0)
+    feedback_status = _get(record, FIELD_FEEDBACK_STATUS, "")
+
+    # בדיקת סטטוס
+    statuses_ok = mapping.get("statuses_to_process", [])
+    if statuses_ok and str(feedback_status).strip() not in statuses_ok:
+        return None
+
+    # קוד שגיאה
+    raw_code = _get(record, FIELD_ERROR_CODE)
+    if raw_code is None:
+        return None
+    try:
+        error_code = int(float(raw_code))
+    except (ValueError, TypeError):
+        return None
+
+    # חיפוש בקובץ מיפוי
+    rule = mapping["error_codes"].get(error_code)
+    if rule is None:
+        # קוד לא מוכר — מנהלת תיק כ-fallback
+        return _build_result(record, record_id, customer, error_code, counter, rule=None,
+                              responsibility=RESP_CASE_MANAGER,
+                              email_format=FORMAT_CASE_MGR,
+                              recipients={"to_role": "מנהלת תיק", "cc_role": None, "path": "unknown_code"})
+
+    # קוד מוחרג
+    if rule.get("excluded", False):
+        return None
+
+    email_format   = rule.get("email_format", FORMAT_EXCLUDED)
+    responsibility = rule.get("responsibility", RESP_CASE_MANAGER)
+
+    # לוגיקת PreMailCondition
+    condition_result = _check_pre_mail_condition(record, rule)
+
+    if condition_result:
+        # תנאי מתקיים → DefaultResponsibility (מוסדי)
+        recipients = {
+            "to_role": rule.get("responsibility_he"),
+            "cc_role": rule.get("cc_responsibility"),
+            "path":    "pre_condition_true",
+        }
+    elif rule.get("override_recipients"):
+        # תנאי לא מתקיים + יש override path
+        recipients = _resolve_recipients(record, rule)
+        # אם ה-override path מוביל לתפקיד שאינו מוסדי — עדכן אחריות ופורמט
+        if recipients["path"] != "default":
+            to_role = recipients["to_role"]
+            responsibility = RESPONSIBILITY_MAP.get(to_role, responsibility)
+            email_format   = _infer_format_from_role(to_role, email_format)
+    else:
+        # אין תנאי ואין override — DefaultResponsibility ישירות
+        recipients = {
+            "to_role": rule.get("responsibility_he"),
+            "cc_role": rule.get("cc_responsibility"),
+            "path":    "default",
+        }
+
+    return _build_result(record, record_id, customer, error_code, counter, rule,
+                         responsibility, email_format, recipients)
+
+
+def _infer_format_from_role(role, default_format):
+    """מסיק פורמט מייל מתפקיד הנמען."""
+    if role in ('רו"ח', "סוכן", "מעסיק", "איש קשר 1 מעסיק"):
+        from mapping_loader import FORMAT_EMPLOYER
+        return FORMAT_EMPLOYER
+    if role == "מנהלת תיק":
+        return FORMAT_CASE_MGR
+    return default_format
+
+
+def _build_result(record, record_id, customer, error_code, counter,
+                  rule, responsibility, email_format, recipients):
+    """בונה את ה-ClassifiedRecord המלא."""
+    rule = rule or {}
+    return {
+        # מזהים
+        "record_id":       record_id,
+        "customer_number": customer,
+        "error_code":      error_code,
+        "counter":         int(counter) if counter is not None else 0,
+
+        # סיווג
+        "responsibility":  responsibility,
+        "email_format":    email_format,
+        "excluded":        False,
+
+        # נמענים (תפקידים — יתורגמו לכתובות ב-email_builder)
+        "to_role":         recipients.get("to_role"),
+        "cc_role":         recipients.get("cc_role"),
+        "routing_path":    recipients.get("path"),
+
+        # תוכן מייל
+        "mail_subject_template":      rule.get("mail_subject"),
+        "explanation_employer":       rule.get("explanation_employer"),
+        "explanation_case_manager":   rule.get("explanation_case_manager"),
+        "error_description":          rule.get("description"),
+
+        # שדות API מקוריים הדרושים לקיבוץ ולבניית מייל
+        "fund_institution_id":   _get(record, FIELD_FUND_ID),
+        "fund_institution_name": _get(record, FIELD_FUND_NAME),
+        "original_file_name":    _get(record, FIELD_ORIGINAL_FILE),
+        "tik_mislaka":           _get(record, FIELD_TIK_MISLAKA),
+        "employee_id":           _get(record, FIELD_EMPLOYEE_ID),
+        "full_name":             _get(record, FIELD_FULL_NAME),      # stub
+        "contact_email":         _get(record, FIELD_CONTACT_EMAIL),
+        "employer_name":         _get(record, FIELD_EMPLOYER_NAME),  # stub
+
+        # כתובות מייל לפי תפקיד (stub — יגיעו מדוד)
+        "email_agent":      _get(record, FIELD_AGENT_EMAIL),
+        "email_accountant": _get(record, FIELD_ACCOUNTANT_EMAIL),
+        "email_contact1":   _get(record, FIELD_CONTACT1_EMAIL),
+        "email_contact2":   _get(record, FIELD_CONTACT2_EMAIL),
+
+        # raw לשימוש מנהלת תיק (Excel עם כל השדות)
+        "_raw": dict(record),
+    }
+
+
+def classify_all(records, mapping):
+    """
+    מסווג רשימת רשומות.
+    מחזיר (classified_list, skipped_count)
+    """
+    classified = []
+    skipped = 0
+    for rec in records:
+        result = classify_record(rec, mapping)
+        if result is None:
+            skipped += 1
+        else:
+            classified.append(result)
+    return classified, skipped
