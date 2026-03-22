@@ -14,6 +14,7 @@ report_builder.py
 """
 
 import io
+from collections import Counter, defaultdict
 from datetime import datetime
 
 import pandas as pd
@@ -117,6 +118,10 @@ def build_run_report(groups, send_results, skipped_records=None, run_date=None):
     bio.seek(0)
     wb = load_workbook(bio)
     _style_workbook(wb, run_date)
+    _build_dashboard_sheet(wb, groups, skipped_records or [], run_date)
+
+    # הזזת דשבורד להיות הגיליון הראשון
+    wb.move_sheet("דשבורד", offset=-len(wb.sheetnames) + 1)
 
     out = io.BytesIO()
     wb.save(out)
@@ -154,3 +159,146 @@ def _style_workbook(wb, run_date):
             ws.column_dimensions[get_column_letter(col_cells[0].column)].width = min(max_len + 4, 50)
 
         ws.freeze_panes = "A2"
+
+
+def _build_dashboard_sheet(wb, groups, skipped_records, run_date):
+    """מוסיף גיליון דשבורד עם 4 טבלאות סיכום."""
+    ws = wb.create_sheet("דשבורד")
+    ws.sheet_view.rightToLeft = True
+
+    H_FILL  = PatternFill("solid", start_color="1F4E79", end_color="1F4E79")
+    H_FONT  = Font(bold=True, color="FFFFFF", name="Arial", size=10)
+    T_FILL  = PatternFill("solid", start_color="D6E4F0", end_color="D6E4F0")  # כותרת טבלה
+    T_FONT  = Font(bold=True, name="Arial", size=10)
+    D_FONT  = Font(name="Arial", size=10)
+    RIGHT   = Alignment(horizontal="right", vertical="center")
+    CENTER  = Alignment(horizontal="center", vertical="center")
+
+    def _hcell(ws, row, col, value):
+        c = ws.cell(row=row, column=col, value=value)
+        c.font = H_FONT; c.fill = H_FILL; c.alignment = CENTER
+
+    def _tcell(ws, row, col, value):
+        c = ws.cell(row=row, column=col, value=value)
+        c.font = T_FONT; c.fill = T_FILL; c.alignment = RIGHT
+
+    def _dcell(ws, row, col, value):
+        c = ws.cell(row=row, column=col, value=value)
+        c.font = D_FONT; c.alignment = RIGHT
+
+    ws.column_dimensions["A"].width = 35
+    ws.column_dimensions["B"].width = 14
+    ws.column_dimensions["C"].width = 14
+    ws.column_dimensions["D"].width = 14
+    ws.column_dimensions["E"].width = 14
+    ws.column_dimensions["F"].width = 14
+    ws.column_dimensions["G"].width = 14
+    ws.column_dimensions["H"].width = 14
+
+    # ---- נתונים גולמיים ----
+    all_records = [r for g in groups for r in g["records"]]
+    total_treated = len(all_records)
+    skipped_list  = list(skipped_records)
+    total_skipped = len(skipped_list)
+    total_fetched = total_treated + total_skipped
+
+    # ספירת סיבות סינון
+    skip_counts = Counter()
+    for _, reason in skipped_list:
+        r = reason or "אחר"
+        if "Counter=0" in r:
+            skip_counts["Counter=0 (שגיאה חדשה)"] += 1
+        elif "קוד שגיאה 1" in r or "קוד שגיאה 2" in r:
+            skip_counts["קוד שגיאה 1/2 (מוחרג)"] += 1
+        elif "מבוטלת" in r:
+            skip_counts["רשומה מבוטלת"] += 1
+        elif "מוחרג בקובץ מיפוי" in r:
+            skip_counts["מוחרג בקובץ מיפוי"] += 1
+        else:
+            skip_counts["אחר"] += 1
+
+    # ---- טבלה 1: סיכום כללי (שורה 1) ----
+    row = 1
+    _hcell(ws, row, 1, f"דשבורד — ריצה {run_date.strftime('%d/%m/%Y %H:%M')} UTC")
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=3)
+    row += 2
+
+    _tcell(ws, row, 1, "קטגוריה"); _tcell(ws, row, 2, "כמות"); _tcell(ws, row, 3, "אחוז")
+    row += 1
+    for label, val in [
+        ("סה\"כ רשומות שהתקבלו",  total_fetched),
+        ("רשומות לטיפול",         total_treated),
+        ("רשומות לא לטיפול",      total_skipped),
+        ("  — Counter=0 (שגיאה חדשה)",      skip_counts.get("Counter=0 (שגיאה חדשה)", 0)),
+        ("  — קוד שגיאה 1/2 (מוחרג)",       skip_counts.get("קוד שגיאה 1/2 (מוחרג)", 0)),
+        ("  — רשומה מבוטלת",                 skip_counts.get("רשומה מבוטלת", 0)),
+        ("  — מוחרג בקובץ מיפוי",            skip_counts.get("מוחרג בקובץ מיפוי", 0)),
+        ("  — אחר",                           skip_counts.get("אחר", 0)),
+    ]:
+        pct = f"{val/total_fetched*100:.1f}%" if total_fetched else "—"
+        _dcell(ws, row, 1, label); _dcell(ws, row, 2, val); _dcell(ws, row, 3, pct)
+        row += 1
+    row += 1
+
+    # ---- טבלה 2: לפי גורם אחראי (שורה row) ----
+    _tcell(ws, row, 1, "גורם אחראי"); _tcell(ws, row, 2, "כמות רשומות"); _tcell(ws, row, 3, "כמות מיילים")
+    row += 1
+    by_format = defaultdict(list)
+    for g in groups:
+        by_format[g["email_format"]].append(g)
+    for fmt, grps in sorted(by_format.items()):
+        rec_count  = sum(len(g["records"]) for g in grps)
+        mail_count = len(grps)
+        _dcell(ws, row, 1, fmt); _dcell(ws, row, 2, rec_count); _dcell(ws, row, 3, mail_count)
+        row += 1
+    row += 1
+
+    # ---- טבלה 3: לפי מדיניות הסלמה (counter) ----
+    _tcell(ws, row, 1, "שבועות (Counter)"); _tcell(ws, row, 2, "כמות רשומות"); _tcell(ws, row, 3, "אחוז מטופלים")
+    row += 1
+    counter_counts = Counter()
+    for r in all_records:
+        c = r.get("counter")
+        try:
+            c = int(float(c)) if c is not None else 0
+        except (ValueError, TypeError):
+            c = 0
+        bucket = str(c) if c <= 4 else "5+"
+        counter_counts[bucket] += 1
+    for bucket in ["1", "2", "3", "4", "5+"]:
+        val = counter_counts.get(bucket, 0)
+        pct = f"{val/total_treated*100:.1f}%" if total_treated else "—"
+        _dcell(ws, row, 1, f"שבוע {bucket}"); _dcell(ws, row, 2, val); _dcell(ws, row, 3, pct)
+        row += 1
+    row += 1
+
+    # ---- טבלה 4: טופ 20 מעסיקים לפי הסלמה ----
+    headers = ["מעסיק", "ח.פ", "סה\"כ", "שבוע 1", "שבוע 2", "שבוע 3", "שבוע 4", "שבוע 5+"]
+    for i, h in enumerate(headers, 1):
+        _tcell(ws, row, i, h)
+    row += 1
+
+    employer_data = defaultdict(lambda: Counter())
+    employer_names = {}
+    for r in all_records:
+        cnum = str(r.get("customer_number") or "—")
+        employer_names[cnum] = r.get("customer_name") or r.get("employer_name") or cnum
+        c = r.get("counter")
+        try:
+            c = int(float(c)) if c is not None else 0
+        except (ValueError, TypeError):
+            c = 0
+        bucket = str(c) if c <= 4 else "5+"
+        employer_data[cnum][bucket] += 1
+
+    top20 = sorted(employer_data.items(), key=lambda x: sum(x[1].values()), reverse=True)[:20]
+    for cnum, buckets in top20:
+        total = sum(buckets.values())
+        row_vals = [
+            employer_names.get(cnum, cnum), cnum, total,
+            buckets.get("1", 0), buckets.get("2", 0),
+            buckets.get("3", 0), buckets.get("4", 0), buckets.get("5+", 0),
+        ]
+        for i, v in enumerate(row_vals, 1):
+            _dcell(ws, row, i, v)
+        row += 1
