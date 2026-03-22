@@ -125,15 +125,9 @@ def classify_record(record, mapping):
 
     מחזיר ClassifiedRecord dict, או None אם הרשומה מוחרגת / לא לעיבוד.
     """
-    record_id     = _get(record, FIELD_RECORD_ID, f"UNKNOWN_{id(record)}")
-    customer      = _get(record, FIELD_CUSTOMER)
-    counter       = _get(record, FIELD_COUNTER, 0)
-    feedback_status = _get(record, FIELD_FEEDBACK_STATUS, "")
-
-    # בדיקת סטטוס
-    statuses_ok = mapping.get("statuses_to_process", [])
-    if statuses_ok and str(feedback_status).strip() not in statuses_ok:
-        return None
+    record_id = _get(record, FIELD_RECORD_ID, f"UNKNOWN_{id(record)}")
+    customer  = _get(record, FIELD_CUSTOMER)
+    counter   = _get(record, FIELD_COUNTER, 0)
 
     # קוד שגיאה
     raw_code = _get(record, FIELD_ERROR_CODE)
