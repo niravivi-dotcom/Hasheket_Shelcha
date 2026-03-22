@@ -14,12 +14,13 @@ email_builder.py
 
 פורמטים נתמכים:
   מוסדי-1  — רשימת שמות קבצים + ת.ז. חד-ערכיים
-  מוסדי-2  — stub (placeholder עד קבלת spec מעידו)
+  מוסדי-2  — פורמט לקוד שגיאה 26
   מעסיק    — HTML table + Excel מצורף
   מנהלת תיק — Excel עם כל שדות API
 """
 
 import io
+from datetime import date
 import pandas as pd
 
 from mapping_loader import (
@@ -96,72 +97,87 @@ def _build_mosadi_1(group, mapping):
     records = group["records"]
     meta    = group["meta"]
 
-    template = mapping.get("email_templates", {}).get(FORMAT_MOSADI_1, {})
+    customer_number = meta.get("customer_number", "")
+    customer_name   = meta.get("customer_name") or ""
+    fund_name       = meta.get("fund_institution_name") or ""
 
-    subject  = _render_subject(template.get("subject"), meta) or _default_subject_mosadi(meta)
-    body_tmpl = template.get("body") or ""
+    subject = f"[מוסדי] {customer_number} {customer_name}".strip()
 
     # שמות קבצים חד-ערכיים
     file_names = sorted({
         r.get("original_file_name") for r in records
         if r.get("original_file_name")
     })
-
     # ת.ז. עובדים חד-ערכיים
     employee_ids = sorted({
         str(r.get("employee_id")) for r in records
         if r.get("employee_id")
     })
 
-    files_html = _ul_list(file_names, label="שמות קבצים:")
-    ids_html   = _ul_list(employee_ids, label="מספרי זיהוי עובדים:")
+    files_html = _ul_list(file_names, label="שמות הקבצים שדווחו:")
+    ids_html   = _ul_list(employee_ids, label="מספרי זהות עובדים:")
 
     body_html = f"""
 {_HTML_STYLE}
 <body dir="rtl">
-  <p>{body_tmpl}</p>
+  <p>שלום,</p>
+  <p>התקבל היזון חוזר מ<strong>{fund_name}</strong> עבור המעסיק <strong>{customer_number}</strong>
+  בגין העובדים הבאים אשר לא נקלטו באופן תקין למרות שחודשי שכר קודמים עם נתונים זהים נקלטו תקין
+  על פי ההיזון החוזר שהתקבל מכם. האם ניתן לבדוק שוב ולשייך?</p>
   {files_html}
   {ids_html}
   {_signature()}
 </body>
 """
-
     return {
         "subject":     subject,
         "body_html":   body_html,
-        "to_email":    None,   # stub — כתובת גוף מוסדי תגיע מדוד בעתיד
+        "to_email":    None,
         "cc_email":    None,
         "attachments": [],
     }
 
 
 # =============================================================================
-# מוסדי-2 (stub)
+# מוסדי-2
 # =============================================================================
 
 def _build_mosadi_2(group, mapping):
-    """
-    stub — פורמט 2 (קוד שגיאה 26).
-    יושלם כשעידו יספק spec מלא.
-    """
-    meta = group["meta"]
-    template = mapping.get("email_templates", {}).get(FORMAT_MOSADI_2, {})
+    records = group["records"]
+    meta    = group["meta"]
 
-    subject  = _render_subject(template.get("subject"), meta) or _default_subject_mosadi(meta)
-    body_tmpl = template.get("body") or "פירוט רשומות שגיאה מצ\"ב."
+    customer_number = meta.get("customer_number", "")
+    customer_name   = meta.get("customer_name") or ""
+    fund_name       = meta.get("fund_institution_name") or ""
+
+    subject = f"[מוסדי] {customer_number} {customer_name}".strip()
+
+    # לכל רשומה: שם מלא + ת.ז + שם קובץ
+    employee_rows = ""
+    file_names = sorted({r.get("original_file_name") for r in records if r.get("original_file_name")})
+    for r in records:
+        emp_id   = r.get("employee_id") or ""
+        name     = r.get("full_name") or "—"
+        employee_rows += f"<li>{name} — ת.ז. {emp_id}</li>"
+
+    files_html = _ul_list(file_names, label="שמות הקבצים:")
 
     body_html = f"""
 {_HTML_STYLE}
 <body dir="rtl">
-  <p>{body_tmpl}</p>
+  <p>שלום,</p>
+  <p>התקבל היזון חוזר מ<strong>{fund_name}</strong> בגין העובדים הבאים כי אין קרן פנסיה לעובד
+  תחת המעסיק. ע"פ הנחיות אגף שוק ההון ביטוח וחיסכון במשרד האוצר לא נדרש ביצוע קבלת בעלות
+  בקרן פנסיה. כל הפרטים לקבלת בעלות נמצאים בממשק שדווח אליכם.</p>
+  <ul>{employee_rows}</ul>
+  {files_html}
   {_signature()}
 </body>
 """
-
     return {
         "subject":     subject,
         "body_html":   body_html,
-        "to_email":    None,   # stub — כתובת גוף מוסדי תגיע מדוד בעתיד
+        "to_email":    None,
         "cc_email":    None,
         "attachments": [],
     }
@@ -175,16 +191,12 @@ def _build_employer(group, mapping):
     records = group["records"]
     meta    = group["meta"]
 
-    template = mapping.get("email_templates", {}).get(FORMAT_EMPLOYER, {})
-
-    # נושא: ח.פ מעסיק + שם מעסיק
     customer = meta.get("customer_number", "")
-    employer = meta.get("employer_name") or ""
-    subject  = _render_subject(template.get("subject"), meta) \
-               or f"פידבק שגיאות פנסיה — {customer} {employer}".strip()
+    employer = meta.get("customer_name") or meta.get("employer_name") or ""
+    subject  = f"[מעסיק] ח.פ {customer} {employer}".strip()
 
-    intro    = template.get("body") or "שלום,\n\nמצורפים למייל זה פרטי שגיאות הטיפול הדרושות:"
-    footer   = "בכל שאלה נשמח לסייע."
+    intro  = "שלום,\n\nמצורפים למייל זה תשובות הקופות לגבי קליטת הכספים לקופות העובדים. האם ידוע ובטיפול?"
+    footer = "בכל שאלה נשמח לסייע."
 
     # HTML table
     table_html = _employer_table(records)
@@ -281,10 +293,9 @@ def _employer_excel(records):
 
 def _build_case_mgr(group, mapping, case_manager_email=None):
     records  = group["records"]
-    template = mapping.get("email_templates", {}).get(FORMAT_CASE_MGR, {})
-
-    subject  = template.get("subject") or "היזון חוזר — רשומות לטיפול מנהלת תיק"
-    body_tmpl = template.get("body") or "מצורף דוח רשומות הדורשות טיפול ידני."
+    today    = date.today().strftime("%d/%m/%Y")
+    subject  = f"[מנהלת תיק] דו\"ח היזון חוזר לתאריך {today}"
+    body_tmpl = "מצורף דוח רשומות הדורשות טיפול ידני."
 
     body_html = f"""
 {_HTML_STYLE}
@@ -318,13 +329,15 @@ def _case_mgr_excel(records):
     for r in records:
         raw = r.get("_raw", {})
         row = {
-            # מזהים מובנים קודם
-            "record_id":      r.get("record_id"),
-            "customer_number": r.get("customer_number"),
-            "error_code":     r.get("error_code"),
-            "counter":        r.get("counter"),
-            "responsibility":  r.get("responsibility"),
-            "routing_path":   r.get("routing_path"),
+            "record_id":               r.get("record_id"),
+            "customer_number":         r.get("customer_number"),
+            "customer_name":           r.get("customer_name"),
+            "error_code":              r.get("error_code"),
+            "error_description":       r.get("error_description"),
+            "explanation_case_manager": r.get("explanation_case_manager"),
+            "counter_weeks":           r.get("counter"),
+            "responsibility":          r.get("responsibility"),
+            "routing_path":            r.get("routing_path"),
         }
         # כל שדות ה-raw (ללא כפילויות)
         for k, v in raw.items():

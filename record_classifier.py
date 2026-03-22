@@ -24,7 +24,7 @@ from mapping_loader import (
 FIELD_RECORD_ID        = "MISPAR_MEZAHE_RESHUMA"
 FIELD_CUSTOMER         = "CustomerNumber"
 FIELD_ERROR_CODE       = "ErrorCodeV4Id"
-FIELD_COUNTER          = "Counter"
+FIELD_COUNTER          = "OnlyOnStatusChange_DatesDiffInWeeks"
 FIELD_FEEDBACK_STATUS  = "FeedbackStatus"
 FIELD_LAST_POSITIVE    = "LastPositive_CHODESH_MASKORET"
 FIELD_CHODESH          = "CHODESH_MASKORET"
@@ -127,7 +127,14 @@ def classify_record(record, mapping):
     """
     record_id = _get(record, FIELD_RECORD_ID, f"UNKNOWN_{id(record)}")
     customer  = _get(record, FIELD_CUSTOMER)
-    counter   = _get(record, FIELD_COUNTER, 0)
+    counter   = _get(record, FIELD_COUNTER)
+
+    # שבוע 0 — שגיאה חדשה, אין פעולה
+    try:
+        if counter is not None and int(float(counter)) == 0:
+            return None
+    except (ValueError, TypeError):
+        pass
 
     # קוד שגיאה
     raw_code = _get(record, FIELD_ERROR_CODE)
@@ -203,7 +210,8 @@ def _build_result(record, record_id, customer, error_code, counter,
         "record_id":       record_id,
         "customer_number": customer,
         "error_code":      error_code,
-        "counter":         int(counter) if counter is not None else 0,
+        "customer_name":   _get(record, "CustomerName"),
+        "counter":         int(float(counter)) if counter is not None else None,
 
         # סיווג
         "responsibility":  responsibility,

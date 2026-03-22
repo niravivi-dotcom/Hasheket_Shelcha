@@ -32,6 +32,7 @@ from record_grouper    import group_records, summarize_groups
 from email_builder     import build_all_emails
 from gmail_sender      import send_all_groups, summarize_results
 from payload_builder   import build_payload, summarize_payload
+from report_builder    import build_run_report
 
 app = Flask(__name__)
 
@@ -203,6 +204,15 @@ def run_pilot_from_api_v2():
 
     print(f"[v2] payload: {summarize_payload(payload_result)}")
 
+    # --- דו"ח סיכום ---
+    try:
+        report_bytes = build_run_report(groups, send_results, run_date=datetime.utcnow())
+        import base64 as _b64
+        report_b64 = _b64.b64encode(report_bytes).decode("utf-8")
+    except Exception as e:
+        print(f"[v2] report build failed: {e}")
+        report_b64 = None
+
     return jsonify({
         "ok":      True,
         "message": "pipeline v2 הסתיים בהצלחה",
@@ -219,6 +229,7 @@ def run_pilot_from_api_v2():
         "send_results":   send_results,
         "update_payload": payload_result["payload"],
         "update_chunks":  payload_result["chunks"],
+        "report_xlsx_b64": report_b64,
     })
 
 

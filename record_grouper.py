@@ -78,6 +78,7 @@ def group_records(classified_records):
                 "fund_institution_id":   fund_id,
                 "fund_institution_name": sample.get("fund_institution_name"),
                 "customer_number":       customer,
+                "customer_name":         sample.get("customer_name"),
                 "employer_name":         sample.get("employer_name"),
                 "to_role":               sample.get("to_role"),
                 "cc_role":               sample.get("cc_role"),
@@ -97,6 +98,7 @@ def group_records(classified_records):
             "records":      records,
             "meta": {
                 "customer_number": customer,
+                "customer_name":   sample.get("customer_name"),
                 "employer_name":   sample.get("employer_name"),
                 "to_role":         to_role,
                 "cc_role":         sample.get("cc_role"),
