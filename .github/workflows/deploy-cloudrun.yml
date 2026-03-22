@@ -43,4 +43,4 @@ jobs:
             --timeout=3600
             --min-instances=0
             --max-instances=1
-            --set-env-vars=GMAIL_SERVICE_ACCOUNT_B64=${{ secrets.GMAIL_SERVICE_ACCOUNT_B64 }}
+            --set-env-vars=GMAIL_SERVICE_ACCOUNT_B64=${{ secrets.GMAIL_SERVICE_ACCOUNT_B64 }},API_SECRET_KEY=${{ secrets.API_SECRET_KEY }},TEST_GMAIL_IMPERSONATE=avigail@hspension.co.il
