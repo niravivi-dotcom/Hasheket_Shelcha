@@ -152,12 +152,16 @@ def _build_mosadi_2(group, mapping):
 
     subject = f"[מוסדי] {customer_number} {customer_name}".strip()
 
-    # לכל רשומה: שם מלא + ת.ז + שם קובץ
+    # לכל עובד ייחודי: שם מלא + ת.ז + שם קובץ
     employee_rows = ""
     file_names = sorted({r.get("original_file_name") for r in records if r.get("original_file_name")})
+    seen_ids = set()
     for r in records:
-        emp_id   = r.get("employee_id") or ""
-        name     = r.get("full_name") or "—"
+        emp_id = str(r.get("employee_id") or "")
+        if not emp_id or emp_id in seen_ids:
+            continue
+        seen_ids.add(emp_id)
+        name = r.get("full_name") or "—"
         employee_rows += f"<li>{name} — ת.ז. {emp_id}</li>"
 
     files_html = _ul_list(file_names, label="שמות הקבצים:")

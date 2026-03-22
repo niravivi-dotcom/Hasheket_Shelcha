@@ -33,6 +33,7 @@ FIELD_TIK_MISLAKA      = "TikMislaka"
 FIELD_ORIGINAL_FILE    = "OriginalFileName"
 FIELD_FUND_NAME        = "FundInstitutionName"
 FIELD_FUND_ID          = "FundInstitutionIdentityNumber"
+FIELD_STATUS_DESC      = "StatusDescription"
 
 # TODO: שדות שיגיעו מדוד בעתיד
 FIELD_FULL_NAME        = "FullName"           # שם מלא עובד — ממתין לדוד
@@ -128,6 +129,11 @@ def classify_record(record, mapping):
     record_id = _get(record, FIELD_RECORD_ID, f"UNKNOWN_{id(record)}")
     customer  = _get(record, FIELD_CUSTOMER)
     counter   = _get(record, FIELD_COUNTER)
+
+    # רשומה מבוטלת — לא לעבד
+    status_desc = _get(record, FIELD_STATUS_DESC, "")
+    if status_desc and "מבוטלת" in str(status_desc):
+        return None
 
     # שבוע 0 — שגיאה חדשה, אין פעולה
     try:
