@@ -52,6 +52,8 @@ def send_all_groups(email_results, service_account_info, default_impersonate, ma
 
     tasks = []
     for group, email_content in email_results:
+        if email_content is None:
+            continue  # מנהלת תיק — מטופל ב-report_builder, לא כאן
         impersonate = test_override or _resolve_impersonate(email_content, default_impersonate)
         tasks.append((group, email_content, impersonate))
 

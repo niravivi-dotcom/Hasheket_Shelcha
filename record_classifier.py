@@ -158,7 +158,8 @@ def classify_record(record, mapping):
         return _build_result(record, record_id, customer, error_code, counter, rule=None,
                               responsibility=RESP_CASE_MANAGER,
                               email_format=FORMAT_CASE_MGR,
-                              recipients={"to_role": "מנהלת תיק", "cc_role": None, "path": "unknown_code"}), None
+                              recipients={"to_role": "מנהלת תיק", "cc_role": None, "path": "unknown_code"},
+                              escalation_level=c_val), None
 
     # קוד מוחרג
     if rule.get("excluded", False):
