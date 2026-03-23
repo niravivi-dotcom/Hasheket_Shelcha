@@ -231,7 +231,6 @@ def _build_result(record, record_id, customer, error_code, counter,
         "customer_number": customer,
         "error_code":      error_code,
         "customer_name":   _get(record, "CustomerName"),
-        "counter":         int(float(counter)) if counter is not None else None,
 
         # סיווג
         "responsibility":  responsibility,

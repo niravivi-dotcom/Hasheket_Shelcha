@@ -47,7 +47,8 @@ def build_run_report(groups, send_results, skipped_records=None, raw_records=Non
         meta   = g.get("meta", {})
         sr     = draft_map.get(key, {})
 
-        counters = [r.get("counter") for r in recs if r.get("counter") is not None]
+        counters = [r.get("_raw", {}).get("OnlyOnStatusChange_DatesDiffInWeeks") for r in recs]
+        counters = [int(float(c)) for c in counters if c is not None]
         c_min = min(counters) if counters else None
         c_max = max(counters) if counters else None
 
@@ -86,7 +87,7 @@ def build_run_report(groups, send_results, skipped_records=None, raw_records=Non
                 "שם עובד":         r.get("full_name"),
                 "קוד שגיאה":       r.get("error_code"),
                 "תיאור שגיאה":     r.get("error_description"),
-                "שבועות":          r.get("counter"),
+                "שבועות":          r.get("_raw", {}).get("OnlyOnStatusChange_DatesDiffInWeeks"),
                 "אחריות":          r.get("responsibility"),
                 "נתיב ניתוב":      r.get("routing_path"),
                 "גוף מוסדי":       r.get("fund_institution_name"),
@@ -105,7 +106,7 @@ def build_run_report(groups, send_results, skipped_records=None, raw_records=Non
             "record_id":   rec.get("MISPAR_MEZAHE_RESHUMA") or rec.get("record_id"),
             "ח.פ מעסיק":  rec.get("CustomerNumber") or rec.get("customer_number"),
             "קוד שגיאה":  rec.get("ErrorCodeV4Id") or rec.get("error_code"),
-            "שבועות":     rec.get("OnlyOnStatusChange_DatesDiffInWeeks") or rec.get("counter"),
+            "שבועות":     rec.get("OnlyOnStatusChange_DatesDiffInWeeks"),
             "סיבה":       reason,
         })
 
@@ -261,7 +262,7 @@ def _build_dashboard_sheet(wb, groups, skipped_records, run_date):
     row += 1
     counter_counts = Counter()
     for r in all_records:
-        c = r.get("counter")
+        c = r.get("_raw", {}).get("OnlyOnStatusChange_DatesDiffInWeeks")
         try:
             c = int(float(c)) if c is not None else 0
         except (ValueError, TypeError):
@@ -286,7 +287,7 @@ def _build_dashboard_sheet(wb, groups, skipped_records, run_date):
     for r in all_records:
         cnum = str(r.get("customer_number") or "—")
         employer_names[cnum] = r.get("customer_name") or r.get("employer_name") or cnum
-        c = r.get("counter")
+        c = r.get("_raw", {}).get("OnlyOnStatusChange_DatesDiffInWeeks")
         try:
             c = int(float(c)) if c is not None else 0
         except (ValueError, TypeError):
