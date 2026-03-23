@@ -357,24 +357,17 @@ def _build_pipeline_sheet(wb, raw_records, groups, skipped_records, draft_map):
             action = "לא ידוע"
             reason = fmt = resp = gk = did = path = ""
 
-        rows.append({
-            "MISPAR_MEZAHE_RESHUMA":              rid,
-            "CustomerNumber":                     raw.get("CustomerNumber"),
-            "CustomerName":                       raw.get("CustomerName"),
-            "ErrorCodeV4Id":                      raw.get("ErrorCodeV4Id"),
-            "StatusDescription":                  raw.get("StatusDescription"),
-            "OnlyOnStatusChange_DatesDiffInWeeks": raw.get("OnlyOnStatusChange_DatesDiffInWeeks"),
-            "LastPositive_CHODESH_MASKORET":      raw.get("LastPositive_CHODESH_MASKORET"),
-            "FundInstitutionName":                raw.get("FundInstitutionName"),
-            "CHODESH_MASKORET":                   raw.get("CHODESH_MASKORET"),
-            "פעולה":         action,
-            "סיבת סינון":    reason,
-            "email_format":  fmt,
-            "אחריות":        resp,
-            "group_key":     gk,
-            "draft_id":      did,
-            "routing_path":  path,
+        row_dict = dict(raw)  # כל שדות ה-API כפי שהגיעו
+        row_dict.update({
+            "פעולה":        action,
+            "סיבת סינון":   reason,
+            "email_format": fmt,
+            "אחריות":       resp,
+            "group_key":    gk,
+            "draft_id":     did,
+            "routing_path": path,
         })
+        rows.append(row_dict)
 
     ws_name = "מעקב pipeline"
     df = pd.DataFrame(rows)

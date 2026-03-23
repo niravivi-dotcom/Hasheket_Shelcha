@@ -217,21 +217,29 @@ def run_pilot_from_api_v2():
     print(f"[v2] payload: {summarize_payload(payload_result)}")
 
     # --- דו"ח סיכום ---
+    import base64 as _b64
     try:
         report_bytes = build_run_report(groups, send_results, skipped_records=skipped_list, raw_records=records_list, run_date=datetime.utcnow())
-        import base64 as _b64
         report_b64 = _b64.b64encode(report_bytes).decode("utf-8")
     except Exception as e:
         print(f"[v2] report build failed: {e}")
         report_b64 = None
 
+    # --- JSON גולמי מדוד (לפני כל עיבוד) ---
+    try:
+        raw_json_bytes = json.dumps(records_list, ensure_ascii=False).encode("utf-8")
+        raw_json_b64   = _b64.b64encode(raw_json_bytes).decode("utf-8")
+    except Exception as e:
+        print(f"[v2] raw json encode failed: {e}")
+        raw_json_b64 = None
+
     return jsonify({
         "ok":      True,
         "message": "pipeline v2 הסתיים בהצלחה",
         "debug": {
-            "demo_mode_raw": _demo_mode_raw,
+            "demo_mode_raw":    _demo_mode_raw,
             "demo_mode_active": _demo_active,
-            "demo_injected": _demo_injected,
+            "demo_injected":    _demo_injected,
         },
         "stats": {
             "fetched":        fetched,
@@ -243,10 +251,11 @@ def run_pilot_from_api_v2():
             "payload_total":  payload_result["total"],
             "payload_chunks": len(payload_result["chunks"]),
         },
-        "send_results":   send_results,
-        "update_payload": payload_result["payload"],
-        "update_chunks":  payload_result["chunks"],
+        "send_results":    send_results,
+        "update_payload":  payload_result["payload"],
+        "update_chunks":   payload_result["chunks"],
         "report_xlsx_b64": report_b64,
+        "raw_records_json_b64": raw_json_b64,
     })
 
 
