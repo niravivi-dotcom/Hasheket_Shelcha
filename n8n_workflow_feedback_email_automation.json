@@ -1,0 +1,538 @@
+{
+  "name": "Feedback Email Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hasheket-trigger",
+        "options": {}
+      },
+      "id": "172825ad-6563-4346-806f-5a91bfd057d0",
+      "name": "Webhook Trigger1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        4640,
+        720
+      ],
+      "webhookId": "hasheket-trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const CLIENT_ID = 'aZ3kLm9PqR2sT7uVxY1bC4dE5fG6hI8jK0nO3pQ4rS5tU6vW7xY8zA9B1C2D3E4F5G6H7I8J9K0LmN1oP2qR3';\nconst API_BASE            = 'https://portal.hspension.co.il/usilenceApi/api';\nconst START_DATE          = '2022-01-01';\nconst TOP                 = 10000;\nconst ACCOUNT_MANAGER_EMAIL = 'e.shpigelman@hspension.co.il';\n\nreturn [{ json: { CLIENT_ID, API_BASE, START_DATE, TOP, ACCOUNT_MANAGER_EMAIL } }];"
+      },
+      "id": "82d0a329-aac7-4b6c-a06b-8a95cdfc0215",
+      "name": "Code: Config1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4832,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const tokenRow = $input.first().json;\nconst config   = $('Code: Config1').first().json;\n\nconst access_token = tokenRow.access_token;\nif (!access_token) {\n  throw new Error('לא התקבל access_token מה-Token Manager. תשובה: ' + JSON.stringify(tokenRow));\n}\n\nreturn [{ json: {\n  access_token,\n  API_BASE:              config.API_BASE,\n  START_DATE:            config.START_DATE,\n  TOP:                   config.TOP,\n  ACCOUNT_MANAGER_EMAIL: config.ACCOUNT_MANAGER_EMAIL\n} }];"
+      },
+      "id": "def5846e-51c8-402e-91f5-2ffc3bd30259",
+      "name": "Code: Extract Token1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5232,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "1uEm-LMnoj7gdXPeK9TxcmkqSyfDDk07c",
+          "mode": "list",
+          "cachedResultName": "error_code_mapping_v2.xlsx",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1uEm-LMnoj7gdXPeK9TxcmkqSyfDDk07c/edit?usp=drivesdk&ouid=103830487809603495701&rtpof=true&sd=true"
+        },
+        "options": {}
+      },
+      "id": "8dbf1d79-192a-4bb9-95b8-adbc16fb53df",
+      "name": "Google Drive: Download Mapping1",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 1,
+      "position": [
+        5232,
+        1152
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "HIfWAjb2gAMN8Krr",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "e0eb68cd-9bfb-49b9-b600-11af5e67e01a",
+      "name": "Merge: Token + Mapping1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        5488,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hasheket-runner-977634044307.me-west1.run.app/run-pilot/from-api-v2",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "access_token",
+              "value": "=={{ $json.access_token }}"
+            },
+            {
+              "name": "api_base",
+              "value": "=={{ $json.API_BASE }}"
+            },
+            {
+              "name": "start_date",
+              "value": "=={{ $json.START_DATE }}"
+            },
+            {
+              "name": "top",
+              "value": "=={{ $json.TOP.toString() }}\n"
+            },
+            {
+              "name": "account_manager_email",
+              "value": "=={{ $json.ACCOUNT_MANAGER_EMAIL }}"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "mapping",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "demo_mode",
+              "value": " true"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "de178420-56f7-41ff-9a34-9f37f731d043",
+      "name": "HTTP: Runner /from-api1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        5696,
+        1056
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "jGkXTQXuG5v1bWiY",
+          "name": "Cloud Run API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\nif (!result.ok) {\n  throw new Error('Runner החזיר שגיאה: ' + (result.message || JSON.stringify(result)));\n}\n// מפצל את מערך הרשומות — כל רשומה תשלח POST נפרד ל-SetFeedbackStatus\nreturn result.update_payload.map(item => ({ json: item }));"
+      },
+      "id": "c81fa391-6660-41ba-9748-96795f28bac6",
+      "name": "Code: Split Update Payload1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6160,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 50,
+        "options": {}
+      },
+      "id": "ada834a9-4258-4d45-8041-7a368e8f8655",
+      "name": "Split in Batches1",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        6432,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://portal.hspension.co.il/usilenceApi/api/services/AutomationFeedback/SetFeedbackStatus",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Code: Extract Token1').first().json.access_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "MISPAR_MEZAHE_RESHUMA",
+              "value": "={{ $json.MISPAR_MEZAHE_RESHUMA }}"
+            },
+            {
+              "name": "Responsibility",
+              "value": "={{ $json.Responsibility }}"
+            },
+            {
+              "name": "EmailDraftId",
+              "value": "={{ $json.EmailDraftId }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "df2bf6dd-6a37-43cb-8dbe-7a4f8171d8f8",
+      "name": "HTTP: POST Update to David1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        6640,
+        1056
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "id": "1bf1924a-a06b-49df-972a-7b214b1da633",
+      "name": "Wait: Delay1",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        6832,
+        1056
+      ],
+      "webhookId": "c84a483b-5e31-45b5-9845-5afb7c1677cb"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "UXW9G2gStavLTG3T",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/UXW9G2gStavLTG3T",
+          "cachedResultName": "AI automation  — refresh token feedback email"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        5040,
+        944
+      ],
+      "id": "ef9ad6ad-334b-4901-902a-66e56e23a88a",
+      "name": "Call 'refresh token feedback email'1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        4656,
+        944
+      ],
+      "id": "03578468-ff89-40a5-8337-e78d2b65418d",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst b64 = item.json.report_xlsx_b64;\nconst stats = item.json.stats || {};\nconst date = new Date().toLocaleDateString('he-IL');\n\nreturn [{\n  json: {\n    filename: `run_report_${new Date().toISOString().slice(0,10)}.xlsx`,\n    subject: `דו\"ח היזון חוזר — ${date}`,\n    body: `שלום עידו,\\n\\nמצורף דו\"ח ריצה מתאריך ${date}.\\n\\nסיכום:\\nרשומות שהתקבלו: ${stats.fetched || 0}\\nטופלו: ${stats.classified || 0}\\nמיילים נשלחו: ${stats.emails_ok || 0}\\n\\nבברכה`,\n  },\n  binary: {\n    attachment: {\n      data: b64,\n      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',\n      fileName: `run_report_${new Date().toISOString().slice(0,10)}.xlsx`,\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5904,
+        1056
+      ],
+      "id": "8d55d1ed-535d-499c-bac2-b8e003278fb9",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "sendTo": "niravivi@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "attachment"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        6096,
+        832
+      ],
+      "id": "c8aee623-5f68-4d5b-a6c8-671f53b41ce4",
+      "name": "Send a message",
+      "webhookId": "7a426370-8da8-4027-9e43-f7206bac7e91",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GJVEdp7PY46BHuE4",
+          "name": "ai.hpension.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cmReports = ($input.first().json.cm_reports || []);\nconst date = new Date().toLocaleDateString('he-IL');\nif (cmReports.length === 0) return [];\nreturn cmReports.map(cm => ({\n  json: {\n    to_email: cm.email,\n    cm_name: cm.name,\n    subject: 'דו\"ח היזון חוזר — ' + date,\n    body: 'שלום ' + cm.name + ',\\n\\nמצורף דו\"ח ריצה מתאריך ' + date + '.\\nהדו\"ח כולל את כל הרשומות המיועדות לטיפולך.\\n\\nבברכה',\n  },\n  binary: {\n    attachment: {\n      data: cm.report_b64,\n      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',\n      fileName: 'דו\"ח_' + (cm.name || 'CM').replace(/ /g, '_') + '_' + new Date().toISOString().slice(0,10) + '.xlsx',\n    }\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6096,
+        1056
+      ],
+      "id": "cm-split-001",
+      "name": "Code: Split CM Reports"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to_email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "attachment"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        6300,
+        1056
+      ],
+      "id": "cm-gmail-001",
+      "name": "Gmail: Send CM Reports",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GJVEdp7PY46BHuE4",
+          "name": "ai.hpension.com"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Code: Config1": {
+      "main": [
+        [
+          {
+            "node": "Google Drive: Download Mapping1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Call 'refresh token feedback email'1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Extract Token1": {
+      "main": [
+        [
+          {
+            "node": "Merge: Token + Mapping1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive: Download Mapping1": {
+      "main": [
+        [
+          {
+            "node": "Merge: Token + Mapping1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge: Token + Mapping1": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Runner /from-api1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Runner /from-api1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Split Update Payload1": {
+      "main": [
+        [
+          {
+            "node": "Split in Batches1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split in Batches1": {
+      "main": [
+        [
+          {
+            "node": "HTTP: POST Update to David1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: POST Update to David1": {
+      "main": [
+        [
+          {
+            "node": "Wait: Delay1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait: Delay1": {
+      "main": [
+        [
+          {
+            "node": "Split in Batches1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'refresh token feedback email'1": {
+      "main": [
+        [
+          {
+            "node": "Code: Extract Token1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Code: Config1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code: Split CM Reports",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Split CM Reports": {
+      "main": [
+        [
+          {
+            "node": "Gmail: Send CM Reports",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "a16eab05-fe5a-4f8d-ab39-4983901657f0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "767fd9268974244a27add4b14a52464d0a5a6e522dd4e7bfb45f8fc8e028d18e"
+  },
+  "id": "DOTE1MgxgrTL8ltl",
+  "tags": []
+}
