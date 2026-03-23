@@ -152,6 +152,17 @@ def run_pilot_from_api_v2():
     fetched = len(records_list)
     print(f"[v2] fetched={fetched} records")
 
+    # --- demo mode: הזרקת counter לרשומות עם null (לצרכי הדגמה בלבד) ---
+    if request.form.get("demo_mode", "").lower() == "true":
+        import random
+        _weights = [1, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5]
+        _injected = 0
+        for r in records_list:
+            if not r.get("OnlyOnStatusChange_DatesDiffInWeeks"):
+                r["OnlyOnStatusChange_DatesDiffInWeeks"] = random.choice(_weights)
+                _injected += 1
+        print(f"[v2] demo_mode: injected counter for {_injected} records")
+
     # --- שלב 2: load mapping ---
     try:
         mapping = load_mapping(io.BytesIO(mapping_file.read()))
