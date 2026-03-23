@@ -100,6 +100,8 @@ def _load_error_codes(xl):
         "נושא מייל":              "mail_subject",
         "הסבר למעסיק":            "explanation_employer",
         "הסבר מנהלת תיק":         "explanation_case_manager",
+        "PreMailConditionField":   "pre_mail_condition_field",
+        "PreMailCondition":        "pre_mail_condition_text",
     }
     df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
 
@@ -125,9 +127,11 @@ def _load_error_codes(xl):
             "cc_override_1":          _clean(row.get("cc_override_1")),
             "override_recipients_2":  _clean(row.get("override_recipients_2")),
             "cc_override_2":          _clean(row.get("cc_override_2")),
-            "mail_subject":           _clean(row.get("mail_subject")),
-            "explanation_employer":   _clean(row.get("explanation_employer")),
+            "mail_subject":             _clean(row.get("mail_subject")),
+            "explanation_employer":     _clean(row.get("explanation_employer")),
             "explanation_case_manager": _clean(row.get("explanation_case_manager")),
+            "pre_mail_condition_field": _clean(row.get("pre_mail_condition_field")),
+            "pre_mail_condition_text":  _clean(row.get("pre_mail_condition_text")),
         }
     return result
 

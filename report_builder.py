@@ -320,11 +320,14 @@ def _build_pipeline_sheet(wb, raw_records, groups, skipped_records, draft_map):
         did = sr.get("draft_id")
         for r in g["records"]:
             classified_lookup[r["record_id"]] = {
-                "email_format":  fmt,
-                "responsibility": r.get("responsibility"),
-                "group_key":     gk,
-                "draft_id":      did,
-                "routing_path":  r.get("routing_path"),
+                "email_format":              fmt,
+                "responsibility":            r.get("responsibility"),
+                "group_key":                 gk,
+                "draft_id":                  did,
+                "routing_path":              r.get("routing_path"),
+                "pre_mail_condition_result": r.get("pre_mail_condition_result"),
+                "pre_mail_condition_field":  r.get("pre_mail_condition_field"),
+                "pre_mail_condition_value":  r.get("pre_mail_condition_value"),
             }
 
     # record_id → reason (סונן)
@@ -358,14 +361,18 @@ def _build_pipeline_sheet(wb, raw_records, groups, skipped_records, draft_map):
             reason = fmt = resp = gk = did = path = ""
 
         row_dict = dict(raw)  # כל שדות ה-API כפי שהגיעו
+        pmc_result = cl.get("pre_mail_condition_result") if cl else None
         row_dict.update({
-            "פעולה":        action,
-            "סיבת סינון":   reason,
-            "email_format": fmt,
-            "אחריות":       resp,
-            "group_key":    gk,
-            "draft_id":     did,
-            "routing_path": path,
+            "פעולה":                       action,
+            "סיבת סינון":                  reason,
+            "email_format":                fmt,
+            "אחריות":                      resp,
+            "group_key":                   gk,
+            "draft_id":                    did,
+            "routing_path":                path,
+            "pre_mail_condition_field":    cl.get("pre_mail_condition_field") if cl else None,
+            "pre_mail_condition_result":   ("TRUE" if pmc_result is True else "FALSE" if pmc_result is False else None),
+            "pre_mail_condition_value":    cl.get("pre_mail_condition_value") if cl else None,
         })
         rows.append(row_dict)
 

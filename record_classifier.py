@@ -71,20 +71,15 @@ def _has_value(record, field):
 def _check_pre_mail_condition(record, rule):
     """
     בודק את תנאי PreMailCondition לרשומה.
-    מחזיר True אם התנאי מתקיים (→ path מוסדי), False אחרת.
-    None אם אין תנאי רלוונטי לקוד הזה.
+    מחזיר True אם התנאי מתקיים (→ DefaultResponsibility),
+             False אם לא מתקיים (→ Override),
+             None אם אין תנאי לקוד הזה.
     """
-    # תנאי 1: LastPositive_CHODESH_MASKORET — כבר קיים ב-API
-    if _has_value(record, FIELD_LAST_POSITIVE):
-        return True
+    condition_field = rule.get("pre_mail_condition_field")
+    if not condition_field:
+        return None  # אין תנאי לקוד הזה
 
-    # TODO תנאי 2: קוד סוג מוצר = קרן פנסיה — ממתין לדוד
-    # if PENSION_FUND_PRODUCT_CODE is not None:
-    #     product_code = _get(record, FIELD_PRODUCT_TYPE)
-    #     if product_code == PENSION_FUND_PRODUCT_CODE:
-    #         return True
-
-    return False
+    return _has_value(record, condition_field)
 
 
 def _resolve_recipients(record, rule):
@@ -174,24 +169,35 @@ def classify_record(record, mapping):
 
     # לוגיקת PreMailCondition
     condition_result = _check_pre_mail_condition(record, rule)
+    condition_field  = rule.get("pre_mail_condition_field")
 
-    if condition_result:
-        # תנאי מתקיים → DefaultResponsibility (מוסדי)
+    if condition_result is True:
+        # תנאי מתקיים → DefaultResponsibility
         recipients = {
             "to_role": rule.get("responsibility_he"),
             "cc_role": rule.get("cc_responsibility"),
             "path":    "pre_condition_true",
         }
+    elif condition_result is False:
+        # תנאי נכשל → ישירות לOverride ללא בדיקת זמינות כתובת מייל
+        to_role = rule.get("override_recipients") or rule.get("responsibility_he")
+        cc_role = rule.get("cc_override_1")
+        responsibility = RESPONSIBILITY_MAP.get(to_role, responsibility)
+        email_format   = _infer_format_from_role(to_role, email_format)
+        recipients = {
+            "to_role": to_role,
+            "cc_role": cc_role,
+            "path":    "pre_condition_false",
+        }
     elif rule.get("override_recipients"):
-        # תנאי לא מתקיים + יש override path
+        # אין תנאי אך יש override — _resolve_recipients לפי זמינות כתובת
         recipients = _resolve_recipients(record, rule)
-        # אם ה-override path מוביל לתפקיד שאינו מוסדי — עדכן אחריות ופורמט
         if recipients["path"] != "default":
             to_role = recipients["to_role"]
             responsibility = RESPONSIBILITY_MAP.get(to_role, responsibility)
             email_format   = _infer_format_from_role(to_role, email_format)
     else:
-        # אין תנאי ואין override — DefaultResponסibility ישירות
+        # אין תנאי, אין override → DefaultResponsibility ישירות
         recipients = {
             "to_role": rule.get("responsibility_he"),
             "cc_role": rule.get("cc_responsibility"),
@@ -199,7 +205,9 @@ def classify_record(record, mapping):
         }
 
     return _build_result(record, record_id, customer, error_code, counter, rule,
-                         responsibility, email_format, recipients), None
+                         responsibility, email_format, recipients,
+                         condition_result=condition_result,
+                         condition_field=condition_field), None
 
 
 def _infer_format_from_role(role, default_format):
@@ -213,7 +221,8 @@ def _infer_format_from_role(role, default_format):
 
 
 def _build_result(record, record_id, customer, error_code, counter,
-                  rule, responsibility, email_format, recipients):
+                  rule, responsibility, email_format, recipients,
+                  condition_result=None, condition_field=None):
     """בונה את ה-ClassifiedRecord המלא."""
     rule = rule or {}
     return {
@@ -255,6 +264,11 @@ def _build_result(record, record_id, customer, error_code, counter,
         "email_accountant": _get(record, FIELD_ACCOUNTANT_EMAIL),
         "email_contact1":   _get(record, FIELD_CONTACT1_EMAIL),
         "email_contact2":   _get(record, FIELD_CONTACT2_EMAIL),
+
+        # PreMailCondition
+        "pre_mail_condition_result": condition_result,
+        "pre_mail_condition_field":  condition_field,
+        "pre_mail_condition_value":  _get(record, condition_field) if condition_field else None,
 
         # raw לשימוש מנהלת תיק (Excel עם כל השדות)
         "_raw": dict(record),
