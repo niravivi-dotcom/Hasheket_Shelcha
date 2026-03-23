@@ -48,13 +48,10 @@ _MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 # Public API
 # =============================================================================
 
-def build_email(group, mapping, case_manager_email=None):
+def build_email(group, mapping):
     """
     מקבל EmailGroup dict (מ-record_grouper) ומחזיר EmailContent dict.
-
-    group            : dict מ-group_records()
-    mapping          : dict מ-load_mapping()
-    case_manager_email : כתובת מייל מנהלת תיק (נמסרת מה-runner)
+    קבוצות מנהלת תיק מדולגות — מטופלות ב-report_builder.
     """
     fmt = group.get("email_format", "")
 
@@ -64,16 +61,13 @@ def build_email(group, mapping, case_manager_email=None):
         return _build_mosadi_2(group, mapping)
     elif fmt == FORMAT_EMPLOYER:
         return _build_employer(group, mapping)
-    elif fmt == FORMAT_CASE_MGR:
-        return _build_case_mgr(group, mapping, case_manager_email)
     else:
-        # fallback — מנהלת תיק
-        return _build_case_mgr(group, mapping, case_manager_email)
+        return None  # מנהלת תיק — מטופל ב-report_builder
 
 
-def build_all_emails(groups, mapping, case_manager_email=None):
+def build_all_emails(groups, mapping):
     """
-    בונה EmailContent לכל קבוצה.
+    בונה EmailContent לכל קבוצה (מוסדי + מעסיק בלבד).
     מחזיר רשימת (group, email_content) tuples.
     skips = מספר קבוצות שנכשלו.
     """
@@ -81,7 +75,7 @@ def build_all_emails(groups, mapping, case_manager_email=None):
     skipped = 0
     for g in groups:
         try:
-            content = build_email(g, mapping, case_manager_email)
+            content = build_email(g, mapping)
             results.append((g, content))
         except Exception as e:
             print(f"[WARN] email_builder: skip group {g.get('group_key')} — {e}")
@@ -302,69 +296,6 @@ def _employer_excel(records):
     return bio.getvalue()
 
 
-# =============================================================================
-# מנהלת תיק
-# =============================================================================
-
-def _build_case_mgr(group, mapping, case_manager_email=None):
-    records  = group["records"]
-    today    = date.today().strftime("%d/%m/%Y")
-    subject  = f"[מנהלת תיק] דו\"ח היזון חוזר לתאריך {today}"
-    body_tmpl = "מצורף דוח רשומות הדורשות טיפול ידני."
-
-    body_html = f"""
-{_HTML_STYLE}
-<body dir="rtl">
-  <p>{_nl2br(body_tmpl)}</p>
-  <p>סה"כ רשומות: {len(records)}</p>
-  {_signature()}
-</body>
-"""
-
-    xlsx_data = _case_mgr_excel(records)
-
-    return {
-        "subject":   subject,
-        "body_html": body_html,
-        "to_email":  case_manager_email,     # נמסר מה-runner
-        "cc_email":  None,                   # TODO: חלוקת To/CC מעידו
-        "attachments": [
-            {
-                "filename": "רשומות_לטיפול_מנהלת_תיק.xlsx",
-                "data":     xlsx_data,
-                "mimetype": _MIME_XLSX,
-            }
-        ],
-    }
-
-
-def _case_mgr_excel(records):
-    """בונה Excel עם כל שדות ה-API (_raw) לכל רשומה."""
-    rows = []
-    for r in records:
-        raw = r.get("_raw", {})
-        row = {
-            "record_id":               r.get("record_id"),
-            "customer_number":         r.get("customer_number"),
-            "customer_name":           r.get("customer_name"),
-            "error_code":              r.get("error_code"),
-            "error_description":       r.get("error_description"),
-            "explanation_case_manager": r.get("explanation_case_manager"),
-            "counter_weeks":           r.get("counter"),
-            "responsibility":          r.get("responsibility"),
-            "routing_path":            r.get("routing_path"),
-        }
-        # כל שדות ה-raw (ללא כפילויות)
-        for k, v in raw.items():
-            if k not in row:
-                row[k] = v
-        rows.append(row)
-
-    df  = pd.DataFrame(rows)
-    bio = io.BytesIO()
-    with pd.ExcelWriter(bio, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="רשומות")
-    return bio.getvalue()
 
 
 # =============================================================================

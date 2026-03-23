@@ -276,7 +276,34 @@ def _build_dashboard_sheet(wb, groups, skipped_records, run_date):
         row += 1
     row += 1
 
-    # ---- טבלה 4: טופ 20 מעסיקים לפי הסלמה ----
+    # ---- טבלה 4: רשומות לפי שבועות — פנימי vs חיצוני ----
+    _hcell(ws, row, 1, "רשומות לטיפול לפי שבועות הסלמה")
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=4)
+    row += 1
+    _tcell(ws, row, 1, "שבועות"); _tcell(ws, row, 2, "חיצוני (מוסדי/מעסיק)"); _tcell(ws, row, 3, "פנימי (מנהלת תיק)"); _tcell(ws, row, 4, "סה\"כ")
+    row += 1
+    from mapping_loader import FORMAT_CASE_MGR
+    ext_counts = Counter()
+    int_counts = Counter()
+    for r in all_records:
+        c = r.get("counter_weeks") or 0
+        try:
+            c = int(c)
+        except (ValueError, TypeError):
+            c = 0
+        bucket = str(c) if c <= 4 else "5+"
+        if r.get("email_format") == FORMAT_CASE_MGR:
+            int_counts[bucket] += 1
+        else:
+            ext_counts[bucket] += 1
+    for bucket in ["1", "2", "3", "4", "5+"]:
+        e = ext_counts.get(bucket, 0)
+        i = int_counts.get(bucket, 0)
+        _dcell(ws, row, 1, f"שבוע {bucket}"); _dcell(ws, row, 2, e); _dcell(ws, row, 3, i); _dcell(ws, row, 4, e + i)
+        row += 1
+    row += 1
+
+    # ---- טבלה 5: טופ 20 מעסיקים לפי הסלמה ----
     headers = ["מעסיק", "ח.פ", "סה\"כ", "שבוע 1", "שבוע 2", "שבוע 3", "שבוע 4", "שבוע 5+"]
     for i, h in enumerate(headers, 1):
         _tcell(ws, row, i, h)
@@ -412,3 +439,64 @@ def _build_pipeline_sheet(wb, raw_records, groups, skipped_records, draft_map):
         tgt_ws.column_dimensions[get_column_letter(col_cells[0].column)].width = min(max_len + 4, 40)
 
     tgt_ws.freeze_panes = "A2"
+
+
+def build_case_manager_reports(groups, send_results, skipped_records=None, run_date=None):
+    """
+    מייצר Excel נפרד לכל מנהלת תיק עם אותם גיליונות כמו build_run_report אבל מסונן.
+    מחזיר רשימת dicts: [{"email": str, "name": str, "report_b64": str}, ...]
+    """
+    import base64
+    run_date   = run_date or datetime.now()
+    draft_map  = {r["group_key"]: r for r in (send_results or [])}
+
+    # קיבוץ לפי מנהלת תיק (לפי email)
+    cm_groups  = defaultdict(list)
+    cm_names   = {}
+    for g in groups:
+        for r in g["records"]:
+            raw = r.get("_raw", {})
+            cm_email = raw.get("CustomerAccountManagerEmail") or ""
+            cm_name  = raw.get("CustomerAccountManagerName") or cm_email
+            if cm_email:
+                cm_groups[cm_email].append(g)
+                cm_names[cm_email] = cm_name
+
+    # הסר כפילויות קבוצות לכל מנהלת תיק
+    for em in cm_groups:
+        seen = set()
+        unique = []
+        for g in cm_groups[em]:
+            if g["group_key"] not in seen:
+                seen.add(g["group_key"])
+                unique.append(g)
+        cm_groups[em] = unique
+
+    results = []
+    for cm_email, cm_grps in cm_groups.items():
+        # גיליון pipeline מסונן — רק רשומות של מנהלת תיק זו
+        cm_raw = []
+        for g in cm_grps:
+            for r in g["records"]:
+                raw = r.get("_raw", {})
+                if (raw.get("CustomerAccountManagerEmail") or "") == cm_email:
+                    cm_raw.append(raw)
+
+        cm_skipped = [
+            (rec, reason) for rec, reason in (skipped_records or [])
+            if (rec.get("CustomerAccountManagerEmail") or "") == cm_email
+        ]
+
+        report_bytes = build_run_report(
+            cm_grps, send_results,
+            skipped_records=cm_skipped,
+            raw_records=cm_raw,
+            run_date=run_date
+        )
+        results.append({
+            "email":      cm_email,
+            "name":       cm_names[cm_email],
+            "report_b64": base64.b64encode(report_bytes).decode("utf-8"),
+        })
+
+    return results

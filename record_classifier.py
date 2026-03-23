@@ -136,7 +136,7 @@ def classify_record(record, mapping):
         if c_val < 1:
             return None, f"Counter={c_val} (פחות מ-1)"
     except (ValueError, TypeError):
-        pass
+        c_val = 0
 
     # קוד שגיאה
     raw_code = _get(record, FIELD_ERROR_CODE)
@@ -204,10 +204,17 @@ def classify_record(record, mapping):
             "path":    "default",
         }
 
+    # מדיניות הסלמה: counter >= 3 → override למנהלת תיק
+    if c_val >= 3:
+        responsibility = RESP_CASE_MANAGER
+        email_format   = FORMAT_CASE_MGR
+        recipients     = {"to_role": "מנהלת תיק", "cc_role": None, "path": f"escalation_c{c_val}"}
+
     return _build_result(record, record_id, customer, error_code, counter, rule,
                          responsibility, email_format, recipients,
                          condition_result=condition_result,
-                         condition_field=condition_field), None
+                         condition_field=condition_field,
+                         escalation_level=c_val), None
 
 
 def _infer_format_from_role(role, default_format):
@@ -222,7 +229,7 @@ def _infer_format_from_role(role, default_format):
 
 def _build_result(record, record_id, customer, error_code, counter,
                   rule, responsibility, email_format, recipients,
-                  condition_result=None, condition_field=None):
+                  condition_result=None, condition_field=None, escalation_level=None):
     """בונה את ה-ClassifiedRecord המלא."""
     rule = rule or {}
     return {
@@ -268,6 +275,9 @@ def _build_result(record, record_id, customer, error_code, counter,
         "pre_mail_condition_result": condition_result,
         "pre_mail_condition_field":  condition_field,
         "pre_mail_condition_value":  _get(record, condition_field) if condition_field else None,
+
+        # הסלמה
+        "counter_weeks":    escalation_level,
 
         # raw לשימוש מנהלת תיק (Excel עם כל השדות)
         "_raw": dict(record),

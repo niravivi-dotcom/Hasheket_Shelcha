@@ -32,7 +32,7 @@ from record_grouper    import group_records, summarize_groups
 from email_builder     import build_all_emails
 from gmail_sender      import send_all_groups, summarize_results
 from payload_builder   import build_payload, summarize_payload
-from report_builder    import build_run_report
+from report_builder    import build_run_report, build_case_manager_reports
 
 app = Flask(__name__)
 
@@ -188,7 +188,7 @@ def run_pilot_from_api_v2():
 
     # --- שלב 5: build emails ---
     try:
-        email_results, build_skipped = build_all_emails(groups, mapping, case_manager_email=acct_mgr or None)
+        email_results, build_skipped = build_all_emails(groups, mapping)
     except Exception as e:
         return jsonify({"ok": False, "message": f"שגיאה בבניית מיילים: {e}"}), 500
 
@@ -218,20 +218,20 @@ def run_pilot_from_api_v2():
 
     # --- דו"ח סיכום ---
     import base64 as _b64
+    run_dt = datetime.utcnow()
     try:
-        report_bytes = build_run_report(groups, send_results, skipped_records=skipped_list, raw_records=records_list, run_date=datetime.utcnow())
+        report_bytes = build_run_report(groups, send_results, skipped_records=skipped_list, raw_records=records_list, run_date=run_dt)
         report_b64 = _b64.b64encode(report_bytes).decode("utf-8")
     except Exception as e:
         print(f"[v2] report build failed: {e}")
         report_b64 = None
 
-    # --- JSON גולמי מדוד (לפני כל עיבוד) ---
+    # --- דוחות למנהלות תיק ---
     try:
-        raw_json_bytes = json.dumps(records_list, ensure_ascii=False).encode("utf-8")
-        raw_json_b64   = _b64.b64encode(raw_json_bytes).decode("utf-8")
+        cm_reports = build_case_manager_reports(groups, send_results, skipped_records=skipped_list, run_date=run_dt)
     except Exception as e:
-        print(f"[v2] raw json encode failed: {e}")
-        raw_json_b64 = None
+        print(f"[v2] case manager reports failed: {e}")
+        cm_reports = []
 
     return jsonify({
         "ok":      True,
@@ -251,11 +251,11 @@ def run_pilot_from_api_v2():
             "payload_total":  payload_result["total"],
             "payload_chunks": len(payload_result["chunks"]),
         },
-        "send_results":    send_results,
-        "update_payload":  payload_result["payload"],
-        "update_chunks":   payload_result["chunks"],
-        "report_xlsx_b64": report_b64,
-        "raw_records_json_b64": raw_json_b64,
+        "send_results":       send_results,
+        "update_payload":     payload_result["payload"],
+        "update_chunks":      payload_result["chunks"],
+        "report_xlsx_b64":    report_b64,
+        "cm_reports":         cm_reports,
     })
 
 
