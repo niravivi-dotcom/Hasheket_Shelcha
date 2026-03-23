@@ -154,7 +154,7 @@ def run_pilot_from_api_v2():
 
     # --- demo mode: הזרקת counter לרשומות עם null (לצרכי הדגמה בלבד) ---
     _demo_mode_raw = request.form.get("demo_mode", "")
-    _demo_active = _demo_mode_raw.lower() == "true"
+    _demo_active = _demo_mode_raw.strip().lower() == "true"
     _demo_injected = 0
     if _demo_active:
         import random
