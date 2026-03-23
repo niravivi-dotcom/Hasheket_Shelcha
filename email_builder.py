@@ -234,10 +234,22 @@ def _build_employer(group, mapping):
     }
 
 
+def _dedup_records(records):
+    """מחזיר רשומות ייחודיות לפי (ת.ז., קוד שגיאה) — שומר סדר הופעה ראשון."""
+    seen = set()
+    result = []
+    for r in records:
+        key = (str(r.get("employee_id") or ""), r.get("error_code"))
+        if key not in seen:
+            seen.add(key)
+            result.append(r)
+    return result
+
+
 def _employer_table(records):
     """HTML table: ת.ז., שם מלא, קוד שגיאה, תיאור שגיאה, טיפול נדרש."""
     rows_html = ""
-    for r in records:
+    for r in _dedup_records(records):
         emp_id   = r.get("employee_id") or ""
         name     = r.get("full_name") or "—"   # stub
         code     = r.get("error_code") or ""
@@ -271,7 +283,7 @@ def _employer_table(records):
 def _employer_excel(records):
     """בונה Excel (bytes) לקבוצת מעסיק."""
     rows = []
-    for r in records:
+    for r in _dedup_records(records):
         rows.append({
             "מ.ז. עובד":     r.get("employee_id"),
             "שם מלא":        r.get("full_name"),      # stub
@@ -281,7 +293,6 @@ def _employer_excel(records):
             "מס' לקוח":      r.get("customer_number"),
             "שם קובץ מקור":  r.get("original_file_name"),
             "תיק מסלקה":     r.get("tik_mislaka"),
-            "Counter":        r.get("counter"),
         })
 
     df  = pd.DataFrame(rows)
