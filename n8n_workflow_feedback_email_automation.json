@@ -323,7 +323,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const cmReports = ($input.first().json.cm_reports || []);\nconst date = new Date().toLocaleDateString('he-IL');\nif (cmReports.length === 0) return [];\nreturn cmReports.map(cm => ({\n  json: {\n    to_email: cm.email,\n    cm_name: cm.name,\n    subject: 'דו\"ח היזון חוזר — ' + date,\n    body: 'שלום ' + cm.name + ',\\n\\nמצורף דו\"ח ריצה מתאריך ' + date + '.\\nהדו\"ח כולל את כל הרשומות המיועדות לטיפולך.\\n\\nבברכה',\n  },\n  binary: {\n    attachment: {\n      data: cm.report_b64,\n      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',\n      fileName: 'דו\"ח_' + (cm.name || 'CM').replace(/ /g, '_') + '_' + new Date().toISOString().slice(0,10) + '.xlsx',\n    }\n  }\n}));"
+        "jsCode": "const runnerOutput = $('HTTP: Runner /from-api1').first().json;\nconst cmReports = (runnerOutput.cm_reports || []);\nconst date = new Date().toLocaleDateString('he-IL');\nif (cmReports.length === 0) return [];\nreturn cmReports.map(cm => ({\n  json: {\n    to_email: cm.email,\n    cm_name: cm.name,\n    subject: 'דו\"ח היזון חוזר — ' + date,\n    body: 'שלום ' + cm.name + ',\n\nמצורף דו\"ח ריצה מתאריך ' + date + '.\nהדו\"ח כולל את כל הרשומות המיועדות לטיפולך.\n\nבברכה',\n  },\n  binary: {\n    attachment: {\n      data: cm.report_b64,\n      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',\n      fileName: 'דו\"ח_' + (cm.name || 'CM').replace(/ /g, '_') + '_' + new Date().toISOString().slice(0,10) + '.xlsx',\n    }\n  }\n}));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
