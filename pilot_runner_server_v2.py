@@ -153,15 +153,16 @@ def run_pilot_from_api_v2():
     print(f"[v2] fetched={fetched} records")
 
     # --- demo mode: הזרקת counter לרשומות עם null (לצרכי הדגמה בלבד) ---
-    if request.form.get("demo_mode", "").lower() == "true":
+    _demo_mode_raw = request.form.get("demo_mode", "")
+    _demo_active = _demo_mode_raw.lower() == "true"
+    _demo_injected = 0
+    if _demo_active:
         import random
         _weights = [1, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5]
-        _injected = 0
         for r in records_list:
             if not r.get("OnlyOnStatusChange_DatesDiffInWeeks"):
                 r["OnlyOnStatusChange_DatesDiffInWeeks"] = random.choice(_weights)
-                _injected += 1
-        print(f"[v2] demo_mode: injected counter for {_injected} records")
+                _demo_injected += 1
 
     # --- שלב 2: load mapping ---
     try:
@@ -227,6 +228,11 @@ def run_pilot_from_api_v2():
     return jsonify({
         "ok":      True,
         "message": "pipeline v2 הסתיים בהצלחה",
+        "debug": {
+            "demo_mode_raw": _demo_mode_raw,
+            "demo_mode_active": _demo_active,
+            "demo_injected": _demo_injected,
+        },
         "stats": {
             "fetched":        fetched,
             "classified":     len(classified),
