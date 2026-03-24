@@ -241,18 +241,22 @@ def _dedup_records(records):
 
 
 def _employer_table(records):
-    """HTML table: ת.ז., שם מלא, קוד שגיאה, תיאור שגיאה, טיפול נדרש."""
+    """HTML table: ת.ז., שם מלא, שם קופה, סוג קופה, קוד שגיאה, תיאור שגיאה, טיפול נדרש."""
     rows_html = ""
     for r in _dedup_records(records):
-        emp_id   = r.get("employee_id") or ""
-        name     = r.get("full_name") or "—"   # stub
-        code     = r.get("error_code") or ""
-        desc     = r.get("error_description") or ""
-        action   = r.get("explanation_employer") or ""
+        emp_id    = r.get("employee_id") or ""
+        name      = r.get("full_name") or "—"
+        fund_name = r.get("fund_institution_name") or "—"
+        fund_type = r.get("fund_institution_type") or "—"
+        code      = r.get("error_code") or ""
+        desc      = r.get("error_description") or ""
+        action    = r.get("explanation_employer") or ""
         rows_html += f"""
         <tr>
           <td>{emp_id}</td>
           <td>{name}</td>
+          <td>{fund_name}</td>
+          <td>{fund_type}</td>
           <td>{code}</td>
           <td>{desc}</td>
           <td>{action}</td>
@@ -264,6 +268,8 @@ def _employer_table(records):
     <tr>
       <th>מ.ז. עובד</th>
       <th>שם מלא</th>
+      <th>שם קופה</th>
+      <th>סוג קופה</th>
       <th>קוד שגיאה</th>
       <th>תיאור שגיאה</th>
       <th>טיפול נדרש</th>
@@ -280,7 +286,9 @@ def _employer_excel(records):
     for r in _dedup_records(records):
         rows.append({
             "מ.ז. עובד":     r.get("employee_id"),
-            "שם מלא":        r.get("full_name"),      # stub
+            "שם מלא":        r.get("full_name"),
+            "שם קופה":       r.get("fund_institution_name"),
+            "סוג קופה":      r.get("fund_institution_type"),
             "קוד שגיאה":     r.get("error_code"),
             "תיאור שגיאה":   r.get("error_description"),
             "טיפול נדרש":    r.get("explanation_employer"),

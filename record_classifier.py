@@ -33,6 +33,7 @@ FIELD_TIK_MISLAKA      = "TikMislaka"
 FIELD_ORIGINAL_FILE    = "OriginalFileName"
 FIELD_FUND_NAME        = "FundInstitutionName"
 FIELD_FUND_ID          = "FundInstitutionIdentityNumber"
+FIELD_FUND_TYPE        = "FundInstitutionType"
 FIELD_STATUS_DESC      = "StatusDescription"
 
 # TODO: שדות שיגיעו מדוד בעתיד
@@ -259,6 +260,7 @@ def _build_result(record, record_id, customer, error_code, counter,
         # שדות API מקוריים הדרושים לקיבוץ ולבניית מייל
         "fund_institution_id":   _get(record, FIELD_FUND_ID),
         "fund_institution_name": _get(record, FIELD_FUND_NAME),
+        "fund_institution_type": _get(record, FIELD_FUND_TYPE),
         "original_file_name":    _get(record, FIELD_ORIGINAL_FILE),
         "tik_mislaka":           _get(record, FIELD_TIK_MISLAKA),
         "employee_id":           _get(record, FIELD_EMPLOYEE_ID),
