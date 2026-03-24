@@ -120,10 +120,6 @@
               "parameterType": "formBinaryData",
               "name": "mapping",
               "inputDataFieldName": "data"
-            },
-            {
-              "name": "demo_mode",
-              "value": " true"
             }
           ]
         },
