@@ -142,11 +142,19 @@ def classify_record(record, mapping):
     # קוד שגיאה
     raw_code = _get(record, FIELD_ERROR_CODE)
     if raw_code is None:
-        return None, "קוד שגיאה חסר"
+        return _build_result(record, record_id, customer, error_code=None, counter=counter, rule=None,
+                              responsibility=RESP_CASE_MANAGER,
+                              email_format=FORMAT_CASE_MGR,
+                              recipients={"to_role": "מנהלת תיק", "cc_role": None, "path": "קוד שגיאה חסר"},
+                              escalation_level=c_val), None
     try:
         error_code = int(float(raw_code))
     except (ValueError, TypeError):
-        return None, "קוד שגיאה לא תקין"
+        return _build_result(record, record_id, customer, error_code=None, counter=counter, rule=None,
+                              responsibility=RESP_CASE_MANAGER,
+                              email_format=FORMAT_CASE_MGR,
+                              recipients={"to_role": "מנהלת תיק", "cc_role": None, "path": "קוד שגיאה חסר"},
+                              escalation_level=c_val), None
 
     # קודים מוחרגים במפורש
     if error_code in (1, 2):

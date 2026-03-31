@@ -198,7 +198,7 @@ def run_pilot_from_api_v2():
 
     # --- שלב 7: build payload ---
     try:
-        payload_result = build_payload(send_results, classified)
+        payload_result = build_payload(send_results, classified, skipped_records=skipped_list)
     except Exception as e:
         return jsonify({"ok": False, "message": f"שגיאה בבניית payload: {e}"}), 500
 
