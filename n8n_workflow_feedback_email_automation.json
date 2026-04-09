@@ -7,13 +7,13 @@
         "path": "hasheket-trigger",
         "options": {}
       },
-      "id": "172825ad-6563-4346-806f-5a91bfd057d0",
+      "id": "00ac44a2-46d3-4da7-97ff-f74ef8e40df4",
       "name": "Webhook Trigger1",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [
-        4640,
-        720
+        2816,
+        384
       ],
       "webhookId": "hasheket-trigger"
     },
@@ -21,26 +21,26 @@
       "parameters": {
         "jsCode": "const CLIENT_ID = 'aZ3kLm9PqR2sT7uVxY1bC4dE5fG6hI8jK0nO3pQ4rS5tU6vW7xY8zA9B1C2D3E4F5G6H7I8J9K0LmN1oP2qR3';\nconst API_BASE            = 'https://portal.hspension.co.il/usilenceApi/api';\nconst START_DATE          = '2022-01-01';\nconst TOP                 = 10000;\nconst ACCOUNT_MANAGER_EMAIL = 'e.shpigelman@hspension.co.il';\n\nreturn [{ json: { CLIENT_ID, API_BASE, START_DATE, TOP, ACCOUNT_MANAGER_EMAIL } }];"
       },
-      "id": "82d0a329-aac7-4b6c-a06b-8a95cdfc0215",
+      "id": "d920a65e-956c-4fed-bc69-46b2102a504b",
       "name": "Code: Config1",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4832,
-        944
+        3008,
+        608
       ]
     },
     {
       "parameters": {
         "jsCode": "const tokenRow = $input.first().json;\nconst config   = $('Code: Config1').first().json;\n\nconst access_token = tokenRow.access_token;\nif (!access_token) {\n  throw new Error('לא התקבל access_token מה-Token Manager. תשובה: ' + JSON.stringify(tokenRow));\n}\n\nreturn [{ json: {\n  access_token,\n  API_BASE:              config.API_BASE,\n  START_DATE:            config.START_DATE,\n  TOP:                   config.TOP,\n  ACCOUNT_MANAGER_EMAIL: config.ACCOUNT_MANAGER_EMAIL\n} }];"
       },
-      "id": "def5846e-51c8-402e-91f5-2ffc3bd30259",
+      "id": "f9330ac8-a2a8-4550-aada-fa2bcd553e87",
       "name": "Code: Extract Token1",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        5232,
-        944
+        3408,
+        608
       ]
     },
     {
@@ -56,13 +56,13 @@
         },
         "options": {}
       },
-      "id": "8dbf1d79-192a-4bb9-95b8-adbc16fb53df",
+      "id": "b441f013-de61-4f49-a31b-21330da1b111",
       "name": "Google Drive: Download Mapping1",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 1,
       "position": [
-        5232,
-        1152
+        3408,
+        816
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -77,13 +77,13 @@
         "combinationMode": "mergeByPosition",
         "options": {}
       },
-      "id": "e0eb68cd-9bfb-49b9-b600-11af5e67e01a",
+      "id": "fabc2deb-d95d-43c9-9994-02b9c5d0717c",
       "name": "Merge: Token + Mapping1",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 2,
       "position": [
-        5488,
-        1056
+        3664,
+        720
       ]
     },
     {
@@ -127,13 +127,13 @@
           "timeout": 300000
         }
       },
-      "id": "de178420-56f7-41ff-9a34-9f37f731d043",
+      "id": "b94aecde-6a8a-4814-97fb-44fbd1f7d470",
       "name": "HTTP: Runner /from-api1",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        5696,
-        1056
+        3872,
+        720
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -144,35 +144,35 @@
     },
     {
       "parameters": {
-        "jsCode": "const result = $input.first().json;\nif (!result.ok) {\n  throw new Error('Runner החזיר שגיאה: ' + (result.message || JSON.stringify(result)));\n}\n// מפצל את מערך הרשומות — כל רשומה תשלח POST נפרד ל-SetFeedbackStatus\nreturn result.update_payload.map(item => ({ json: item }));"
+        "jsCode": "// קורא ישירות מ-Runner — לא תלוי בחיבור הפיזי של ה-node\nconst result = $('HTTP: Runner /from-api1').first().json;\nif (!result.ok) {\n  throw new Error('Runner החזיר שגיאה: ' + (result.message || JSON.stringify(result)));\n}\n// update_chunks: מערך של batches מוכנים (עד 1000 רשומות כל אחד)\n// כל פריט יישלח ב-POST אחד ל-SetFeedbackStatusBatch\nconst chunks = result.update_chunks || [];\nif (chunks.length === 0) {\n  return [{ json: { chunk: [], chunk_index: 1, total_chunks: 0 } }];\n}\nreturn chunks.map((chunk, i) => ({\n  json: { chunk, chunk_index: i + 1, total_chunks: chunks.length }\n}));"
       },
-      "id": "c81fa391-6660-41ba-9748-96795f28bac6",
+      "id": "66e5580e-8240-48dd-99df-6cd63036b059",
       "name": "Code: Split Update Payload1",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        6160,
-        1056
+        4720,
+        720
       ]
     },
     {
       "parameters": {
-        "batchSize": 50,
+        "batchSize": 1,
         "options": {}
       },
-      "id": "ada834a9-4258-4d45-8041-7a368e8f8655",
+      "id": "5ed10e72-d4aa-483b-aa72-7c2377fbc7eb",
       "name": "Split in Batches1",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        6432,
-        1056
+        4960,
+        720
       ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://portal.hspension.co.il/usilenceApi/api/services/AutomationFeedback/SetFeedbackStatus",
+        "url": "https://portal.hspension.co.il/usilenceApi/api/services/AutomationFeedback/SetFeedbackStatusBatch",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -183,53 +183,58 @@
             {
               "name": "Content-Type",
               "value": "application/json"
+            },
+            {
+              "name": "api_version",
+              "value": "1.0"
             }
           ]
         },
         "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "MISPAR_MEZAHE_RESHUMA",
-              "value": "={{ $json.MISPAR_MEZAHE_RESHUMA }}"
-            },
-            {
-              "name": "Responsibility",
-              "value": "={{ $json.Responsibility }}"
-            },
-            {
-              "name": "EmailDraftId",
-              "value": "={{ $json.EmailDraftId }}"
-            }
-          ]
-        },
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.chunk) }}",
         "options": {
-          "timeout": 30000
+          "timeout": 60000
         }
       },
-      "id": "df2bf6dd-6a37-43cb-8dbe-7a4f8171d8f8",
+      "id": "ffc29789-4d25-4c13-8ee8-9723c43f52a8",
       "name": "HTTP: POST Update to David1",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        6640,
-        1056
+        5168,
+        720
       ],
       "retryOnFail": true,
-      "waitBetweenTries": 5000
+      "waitBetweenTries": 5000,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// תגובת SetFeedbackStatusBatch:\n//   []                             → הכל עבר בהצלחה\n//   [{success:false, message, ...}] → יש כשלונות (רק הכושלים)\nconst item = $input.first();\nconst response = item.json;\nconst chunkIndex = item.json.chunk_index || '?';\n\n// [] = הצלחה מלאה (n8n ממיר ריק ל-object ריק, או מערך ריק)\nconst isArray = Array.isArray(response);\nconst failures = isArray ? response.filter(r => r.success === false) : [];\n\nif (!isArray || failures.length === 0) {\n  console.log(`✅ [Chunk ${chunkIndex}] SetFeedbackStatusBatch: כל הרשומות נקלטו בהצלחה`);\n} else {\n  // לא עוצרים — רושמים ל-log ומשיכים\n  console.error(\n    `⚠️ [Chunk ${chunkIndex}] SetFeedbackStatusBatch: ${failures.length} כשלונות`,\n    JSON.stringify(failures)\n  );\n}\n\nreturn $input.all();"
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Code: Handle Batch Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5360,
+        720
+      ]
     },
     {
       "parameters": {
         "amount": 3,
         "unit": "seconds"
       },
-      "id": "1bf1924a-a06b-49df-972a-7b214b1da633",
+      "id": "3846a691-80f9-4670-8f16-637a855b9230",
       "name": "Wait: Delay1",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
       "position": [
-        6832,
-        1056
+        5360,
+        720
       ],
       "webhookId": "c84a483b-5e31-45b5-9845-5afb7c1677cb"
     },
@@ -255,10 +260,10 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        5040,
-        944
+        3216,
+        608
       ],
-      "id": "ef9ad6ad-334b-4901-902a-66e56e23a88a",
+      "id": "536dbc28-8f21-4198-b015-7707b988222a",
       "name": "Call 'refresh token feedback email'1"
     },
     {
@@ -266,10 +271,10 @@
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        4656,
-        944
+        2832,
+        608
       ],
-      "id": "03578468-ff89-40a5-8337-e78d2b65418d",
+      "id": "53088c3d-cbef-4326-8428-fcc3fc56abac",
       "name": "When clicking ‘Execute workflow’"
     },
     {
@@ -279,10 +284,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        5904,
-        1056
+        4080,
+        720
       ],
-      "id": "8d55d1ed-535d-499c-bac2-b8e003278fb9",
+      "id": "c826e568-c315-42a2-99e5-2f2d107d35bb",
       "name": "Code in JavaScript"
     },
     {
@@ -304,10 +309,10 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        6096,
-        832
+        4272,
+        496
       ],
-      "id": "c8aee623-5f68-4d5b-a6c8-671f53b41ce4",
+      "id": "c7847d01-6c96-4f97-b599-7fc1a39ba6e3",
       "name": "Send a message",
       "webhookId": "7a426370-8da8-4027-9e43-f7206bac7e91",
       "credentials": {
@@ -319,15 +324,15 @@
     },
     {
       "parameters": {
-        "jsCode": "const runnerOutput = $('HTTP: Runner /from-api1').first().json;\nconst cmReports = (runnerOutput.cm_reports || []);\nconst date = new Date().toLocaleDateString('he-IL');\nif (cmReports.length === 0) return [];\nreturn cmReports.map(cm => ({\n  json: {\n    to_email: cm.email,\n    cm_name: cm.name,\n    subject: 'דו\"ח היזון חוזר — ' + date,\n    body: 'שלום ' + cm.name + ',\n\nמצורף דו\"ח ריצה מתאריך ' + date + '.\nהדו\"ח כולל את כל הרשומות המיועדות לטיפולך.\n\nבברכה',\n  },\n  binary: {\n    attachment: {\n      data: cm.report_b64,\n      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',\n      fileName: 'דו\"ח_' + (cm.name || 'CM').replace(/ /g, '_') + '_' + new Date().toISOString().slice(0,10) + '.xlsx',\n    }\n  }\n}));"
+        "jsCode": "const runnerOutput = $('HTTP: Runner /from-api1').first().json;\nconst cmReports = (runnerOutput.cm_reports || []);\nconst date = new Date().toLocaleDateString('he-IL');\nif (cmReports.length === 0) return [];\nreturn cmReports.map(cm => ({\n  json: {\n    to_email: cm.email,\n    cm_name: cm.name,\n    subject: 'דו\"ח היזון חוזר — ' + date,\n    body: 'שלום ' + cm.name + ',\\n\\nמצורף דו\"ח ריצה מתאריך ' + date + '.\\nהדו\"ח כולל את כל הרשומות המיועדות לטיפולך.\\n\\nבברכה',\n  },\n  binary: {\n    attachment: {\n      data: cm.report_b64,\n      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',\n      fileName: 'דוח_' + (cm.name || 'CM').replace(/ /g, '_') + '_' + new Date().toISOString().slice(0,10) + '.xlsx',\n    }\n  }\n}));\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        6096,
-        1056
+        4272,
+        720
       ],
-      "id": "cm-split-001",
+      "id": "607fc43c-e277-46f6-a49c-c52f0dc1e136",
       "name": "Code: Split CM Reports"
     },
     {
@@ -349,11 +354,12 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        6300,
-        1056
+        4480,
+        720
       ],
-      "id": "cm-gmail-001",
+      "id": "0016cf65-d890-43f5-840b-0b4b9978d211",
       "name": "Gmail: Send CM Reports",
+      "webhookId": "1745f1bb-757f-4fb9-b975-eea1cde012f0",
       "credentials": {
         "gmailOAuth2": {
           "id": "GJVEdp7PY46BHuE4",
@@ -450,6 +456,17 @@
       "main": [
         [
           {
+            "node": "Code: Handle Batch Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Handle Batch Response": {
+      "main": [
+        [
+          {
             "node": "Wait: Delay1",
             "type": "main",
             "index": 0
@@ -518,17 +535,16 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "a16eab05-fe5a-4f8d-ab39-4983901657f0",
+  "versionId": "fa0de04b-0be5-4d8b-90f6-681bd3068c0b",
   "meta": {
-    "templateCredsSetupCompleted": true,
     "instanceId": "767fd9268974244a27add4b14a52464d0a5a6e522dd4e7bfb45f8fc8e028d18e"
   },
-  "id": "DOTE1MgxgrTL8ltl",
+  "id": "gKSbbZjPZVhDcKea",
   "tags": []
 }
