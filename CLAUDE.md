@@ -99,23 +99,33 @@ hspension manages pension funds. Employers submit monthly salary reports ("הי�
 - `POST https://portalstage.hspension.co.il/usilenceApi/api/services/AutomationFeedback/GetFeedbackData`
 - Body: `{"StartDate":"2022-01-01"}`
 
-### SetFeedbackStatus
-- `POST https://portalstage.hspension.co.il/usilenceApi/api/services/AutomationFeedback/SetFeedbackStatus`
-- **מבנה נוכחי (POST בודד):** `{"MISPAR_MEZAHE_RESHUMA": string, "TreatmentStatus": string, "Counter": int}`
-- **מבנה מוצע (bulk — ממתין לדוד):**
+### SetFeedbackStatus (בודד)
+- `POST .../SetFeedbackStatus` — נשאר פעיל, לשימוש חד-פעמי בלבד
+
+### SetFeedbackStatusBatch ✅ (פעיל מ-2026-04-01)
+- `POST https://portal.hspension.co.il/usilenceApi/api/services/AutomationFeedback/SetFeedbackStatusBatch`
+- **Headers:** `Authorization: Bearer <token>`, `api_version: 1.0`
+- **Body:** מערך JSON של רשומות:
 ```json
 [
   {
-    "MISPAR_MEZAHE_RESHUMA": "XXX",
-    "Responsibility": "employer",
-    "EmailDraftId": "r-123456789"
+    "MISPAR_MEZAHE_RESHUMA": "FEE3C94B-...",
+    "TreatmentStatus": "נשלח מייל למעסיק שבוע 1",
+    "Counter": 1,
+    "Responsibility": "מעסיק",
+    "EmailFormat": "employer",
+    "RoutingReason": "ברירת מחדל",
+    "EmailDraftId": "draft-id-from-gmail",
+    "SkippedReason": null
   }
 ]
 ```
-- ערכי Responsibility: `employer` / `institutional` / `case_manager` / `accountant` / `agent`
-- EmailDraftId = Gmail draft_id, יהיה `null` עבור Counter=0 (לשלב הטסט — כל הרשומות נשלחות כולל Counter=0)
-- **נפח:** טסט ~8K רשומות | פרודקשן ~50K+ רשומות → חובה לשלוח ב-chunks של עד 1000 רשומות לבקשה (~100KB לבקשה)
-- Response: 204 No Content
+- **שדות חובה:** `MISPAR_MEZAHE_RESHUMA`, `TreatmentStatus`, `Counter`
+- **שדות אופציונליים:** `Responsibility` (max 50), `EmailFormat` (max 50), `RoutingReason` (max 100), `EmailDraftId` (max 100), `SkippedReason` (max 100)
+- **Response הצלחה:** `[]` (מערך ריק)
+- **Response כשלון חלקי:** `[{"MISPAR_MEZAHE_RESHUMA":"...", "success":false, "message":"..."}]` — רק הכשלונות
+- **נפח:** chunks של עד 1000 רשומות לבקשה
+- **שדות חדשים חוזרים גם ב-GetFeedbackData** לכל רשומה
 
 ---
 
@@ -151,13 +161,13 @@ hspension manages pension funds. Employers submit monthly salary reports ("הי�
 
 ---
 
-## Current Status (2026-03-23)
+## Current Status (2026-04-09)
 
 ### Done
 - ✅ Python engine: record_classifier + email_builder + report_builder עובד end-to-end
 - ✅ Cloud Run (me-west1) — CI/CD דרך GitHub Actions
 - ✅ Token rotation: DataTable `Feedback_email_token` + sub-workflow
-- ✅ n8n workflow (16 nodes): Token → Fetch → Merge → Runner → Split CM Reports → Gmail CM → SetFeedbackStatus
+- ✅ n8n workflow (17 nodes): Token → Fetch → Merge → Runner → Split CM Reports → Gmail CM → SetFeedbackStatusBatch
 - ✅ Gmail drafts: טיוטות נוצרות בתיבה של אביגיל (TEST_GMAIL_IMPERSONATE)
 - ✅ PreMailCondition: 18 קודי שגיאה בודקים LastPositive_CHODESH_MASKORET לפני סיווג
 - ✅ קודי שגיאה 1 ו-2 מוחרגים לחלוטין (לא ממופים)
@@ -165,12 +175,10 @@ hspension manages pension funds. Employers submit monthly salary reports ("הי�
 - ✅ build_case_manager_reports(): Excel נפרד לכל מנהלת תיק
 - ✅ n8n: Code: Split CM Reports + Gmail: Send CM Reports — אומת, מייל התקבל אצל אביגיל
 - ✅ דשבורד Excel: טבלת הסלמה לפי שבועות (חיצוני / פנימי)
+- ✅ **SetFeedbackStatusBatch** — endpoint זמין (דוד, 2026-04-01) | payload_builder מעודכן | n8n עודכן
 
 ### Open Issues Before Production
-1. **SetFeedbackStatus bulk endpoint:** ממתין לדוד לספק endpoint שמקבל מערך (נשאל 2026-03-19)
-2. **Scheduled trigger:** להחליף Webhook ב-Cron
-3. **StartDate:** דוד יגביל ל-90 יום אחורה בפרודקשן
-4. **אימות תוכן מיילים חיצוניים:** לוודא מעסיקים/מוסדיים — תוכן ופילטור נכונים
-
-### ממתין לתשובה חיצונית
-- **דוד** — bulk endpoint ל-SetFeedbackStatus (נשאל 2026-03-19)
+1. **Scheduled trigger:** להחליף Manual Trigger ב-Cron
+2. **StartDate:** דוד יגביל ל-90 יום אחורה בפרודקשן
+3. **אימות תוכן מיילים חיצוניים:** לוודא מעסיקים/מוסדיים — תוכן ופילטור נכונים
+4. **בדיקת end-to-end עם Batch endpoint:** לאמת שה-n8n שולח chunks נכון ומטפל בכשלונות
