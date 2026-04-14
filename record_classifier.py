@@ -37,7 +37,8 @@ FIELD_FUND_TYPE        = "FundInstitutionType"
 FIELD_STATUS_DESC      = "StatusDescription"
 
 # TODO: שדות שיגיעו מדוד בעתיד
-FIELD_FULL_NAME        = "FullName"           # שם מלא עובד — ממתין לדוד
+FIELD_FIRST_NAME       = "EmployeeFirstName"   # שם פרטי עובד
+FIELD_LAST_NAME        = "EmployeeLastName"    # שם משפחה עובד
 FIELD_AGENT_EMAIL      = "AgentEmail"         # מייל סוכן — ממתין לדוד
 FIELD_ACCOUNTANT_EMAIL = "AccountantEmail"    # מייל רו"ח — ממתין לדוד
 FIELD_CONTACT1_EMAIL   = "Contact1Email"      # איש קשר 1 מעסיק — ממתין לדוד
@@ -301,7 +302,10 @@ def _build_result(record, record_id, customer, error_code, counter,
         "original_file_name":    _get(record, FIELD_ORIGINAL_FILE),
         "tik_mislaka":           _get(record, FIELD_TIK_MISLAKA),
         "employee_id":           _get(record, FIELD_EMPLOYEE_ID),
-        "full_name":             _get(record, FIELD_FULL_NAME),      # stub
+        "full_name":             " ".join(filter(None, [
+                                     _get(record, FIELD_FIRST_NAME),
+                                     _get(record, FIELD_LAST_NAME)
+                                 ])) or None,
         "contact_email":         _get(record, FIELD_CONTACT_EMAIL),
         "employer_name":         _get(record, FIELD_EMPLOYER_NAME),  # stub
 
