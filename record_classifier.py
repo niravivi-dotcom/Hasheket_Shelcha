@@ -69,18 +69,47 @@ def _has_value(record, field):
     return val is not None and str(val).strip() not in ("", "nan", "None")
 
 
+def _months_diff(chodesh_current, chodesh_last_positive):
+    """
+    מחשב הפרש בחודשים בין שני שדות YYYYMM.
+    מחזיר int (חיובי = chodesh_current מאוחר יותר), None אם אחד הערכים לא תקין.
+    """
+    try:
+        c = int(str(chodesh_current).strip())
+        l = int(str(chodesh_last_positive).strip())
+        return (c // 100) * 12 + (c % 100) - ((l // 100) * 12 + (l % 100))
+    except (ValueError, TypeError):
+        return None
+
+
 def _check_pre_mail_condition(record, rule):
     """
     בודק את תנאי PreMailCondition לרשומה.
     מחזיר True אם התנאי מתקיים (→ DefaultResponsibility),
              False אם לא מתקיים (→ Override),
              None אם אין תנאי לקוד הזה.
+
+    תנאי מתקיים כאשר:
+      1. LastPositive_CHODESH_MASKORET קיים (לא null)
+      2. הפרש בחודשים בין CHODESH_MASKORET ל-LastPositive ≤ 6
     """
     condition_field = rule.get("pre_mail_condition_field")
     if not condition_field:
         return None  # אין תנאי לקוד הזה
 
-    return _has_value(record, condition_field)
+    if not _has_value(record, condition_field):
+        return False  # שדה ריק → תנאי נכשל
+
+    # בדיקת טווח: LastPositive חייב להיות לא יותר מ-6 חודשים לפני CHODESH_MASKORET
+    last_positive   = _get(record, condition_field)
+    current_chodesh = _get(record, FIELD_CHODESH)
+
+    if current_chodesh is not None:
+        diff = _months_diff(current_chodesh, last_positive)
+        if diff is None or diff > 6:
+            return False  # פער > 6 חודשים → תנאי נכשל → אחריות עוברת למעסיק
+
+    return True
 
 
 def _resolve_recipients(record, rule):
