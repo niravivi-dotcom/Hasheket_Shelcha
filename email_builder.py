@@ -56,13 +56,17 @@ def build_email(group, mapping):
     fmt = group.get("email_format", "")
 
     if fmt == FORMAT_MOSADI_1:
-        return _build_mosadi_1(group, mapping)
+        content = _build_mosadi_1(group, mapping)
     elif fmt == FORMAT_MOSADI_2:
-        return _build_mosadi_2(group, mapping)
+        content = _build_mosadi_2(group, mapping)
     elif fmt == FORMAT_EMPLOYER:
-        return _build_employer(group, mapping)
+        content = _build_employer(group, mapping)
     else:
         return None  # מנהלת תיק — מטופל ב-report_builder
+
+    if content is not None:
+        content["account_manager_email"] = group.get("meta", {}).get("account_manager_email")
+    return content
 
 
 def build_all_emails(groups, mapping):

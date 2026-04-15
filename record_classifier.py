@@ -301,6 +301,7 @@ def _build_result(record, record_id, customer, error_code, counter,
         "fund_institution_type": _get(record, FIELD_FUND_TYPE),
         "original_file_name":    _get(record, FIELD_ORIGINAL_FILE),
         "tik_mislaka":           _get(record, FIELD_TIK_MISLAKA),
+        "account_manager_email":  _get(record, "CustomerAccountManagerEmail"),
         "employee_id":           _get(record, FIELD_EMPLOYEE_ID),
         "full_name":             " ".join(filter(None, [
                                      _get(record, FIELD_FIRST_NAME),

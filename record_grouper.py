@@ -82,7 +82,8 @@ def group_records(classified_records):
                 "employer_name":         sample.get("employer_name"),
                 "to_role":               sample.get("to_role"),
                 "cc_role":               sample.get("cc_role"),
-                "mail_subject_template": sample.get("mail_subject_template"),
+                "mail_subject_template":  sample.get("mail_subject_template"),
+                "account_manager_email":  sample.get("account_manager_email"),
             },
         })
 
@@ -103,8 +104,9 @@ def group_records(classified_records):
                 "to_role":         to_role,
                 "cc_role":         sample.get("cc_role"),
                 # כתובות מייל (stub — יגיעו מדוד)
-                "to_email":        _resolve_email(sample, to_role),
-                "cc_email":        _resolve_email(sample, sample.get("cc_role")),
+                "to_email":              _resolve_email(sample, to_role),
+                "cc_email":              _resolve_email(sample, sample.get("cc_role")),
+                "account_manager_email": sample.get("account_manager_email"),
             },
         })
 
