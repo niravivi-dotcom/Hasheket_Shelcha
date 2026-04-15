@@ -197,7 +197,7 @@ def run_pilot_from_api_v2():
 
     # --- שלב 6: send / create drafts ---
     service_account_info = _load_service_account()
-    default_impersonate  = os.environ.get("TEST_GMAIL_IMPERSONATE", acct_mgr or "")
+    default_impersonate  = os.environ.get("TEST_GMAIL_IMPERSONATE", acct_mgr_list[0] if acct_mgr_list else "")
 
     try:
         send_results, send_skipped = send_all_groups(
