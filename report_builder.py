@@ -77,22 +77,24 @@ def build_run_report(groups, send_results, skipped_records=None, raw_records=Non
         sr  = draft_map.get(key, {})
         for r in g["records"]:
             detail_rows.append({
-                "פורמט":           fmt,
-                "מפתח קבוצה":      key,
-                "draft_id":        sr.get("draft_id"),
-                "record_id":       r.get("record_id"),
-                "ח.פ מעסיק":       r.get("customer_number"),
-                "שם מעסיק":        r.get("customer_name"),
-                "מ.ז. עובד":       r.get("employee_id"),
-                "שם עובד":         r.get("full_name"),
-                "קוד שגיאה":       r.get("error_code"),
-                "תיאור שגיאה":     r.get("error_description"),
-                "שבועות":          r.get("_raw", {}).get("OnlyOnStatusChange_DatesDiffInWeeks"),
-                "אחריות":          r.get("responsibility"),
-                "נתיב ניתוב":      r.get("routing_path"),
-                "גוף מוסדי":       r.get("fund_institution_name"),
-                "שם קובץ מקור":    r.get("original_file_name"),
-                "חודש שכר":        r.get("_raw", {}).get("CHODESH_MASKORET"),
+                "פורמט":              fmt,
+                "מפתח קבוצה":         key,
+                "draft_id":           sr.get("draft_id"),
+                "record_id":          r.get("record_id"),
+                "ח.פ מעסיק":          r.get("customer_number"),
+                "שם מעסיק":           r.get("customer_name"),
+                "מ.ז. עובד":          r.get("employee_id"),
+                "שם עובד":            r.get("full_name"),
+                "קוד שגיאה":          r.get("error_code"),
+                "תיאור שגיאה":        r.get("error_description"),
+                "שבועות":             r.get("_raw", {}).get("OnlyOnStatusChange_DatesDiffInWeeks"),
+                "אחריות":             r.get("responsibility"),
+                "נתיב ניתוב":         r.get("routing_path"),
+                "גוף מוסדי":          r.get("fund_institution_name"),
+                "שם קובץ מקור":       r.get("original_file_name"),
+                "חודש שכר":           r.get("_raw", {}).get("CHODESH_MASKORET"),
+                "מנהלת תיק":          r.get("_raw", {}).get("CustomerAccountManagerName"),
+                "מייל מנהלת תיק":     r.get("_raw", {}).get("CustomerAccountManagerEmail"),
             })
 
     # === גיליון 3: מוחרגות ===
@@ -250,9 +252,19 @@ def _build_dashboard_sheet(wb, groups, skipped_records, run_date):
     by_format = defaultdict(list)
     for g in groups:
         by_format[g["email_format"]].append(g)
+    from mapping_loader import FORMAT_CASE_MGR as _FCM
     for fmt, grps in sorted(by_format.items()):
         rec_count  = sum(len(g["records"]) for g in grps)
-        mail_count = len(grps)
+        if fmt == _FCM:
+            # ספירת מנהלות תיק ייחודיות לפי CustomerAccountManagerEmail
+            cm_emails = {
+                r.get("_raw", {}).get("CustomerAccountManagerEmail")
+                for g in grps for r in g["records"]
+                if r.get("_raw", {}).get("CustomerAccountManagerEmail")
+            }
+            mail_count = len(cm_emails) if cm_emails else 1
+        else:
+            mail_count = len(grps)
         _dcell(ws, row, 1, fmt); _dcell(ws, row, 2, rec_count); _dcell(ws, row, 3, mail_count)
         row += 1
     row += 1
@@ -303,7 +315,53 @@ def _build_dashboard_sheet(wb, groups, skipped_records, run_date):
         row += 1
     row += 1
 
-    # ---- טבלה 5: טופ 20 מעסיקים לפי הסלמה ----
+    # ---- טבלה 5: רשומות לפי מנהלת תיק + שבועות ----
+    _hcell(ws, row, 1, "רשומות לטיפול לפי מנהלת תיק")
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=8)
+    row += 1
+    cm_headers = ["מנהלת תיק", "סה\"כ", "שבוע 1", "שבוע 2", "שבוע 3", "שבוע 4", "שבוע 5+"]
+    for i, h in enumerate(cm_headers, 1):
+        _tcell(ws, row, i, h)
+    row += 1
+
+    cm_data = defaultdict(lambda: Counter())
+    cm_display_names = {}
+    for r in all_records:
+        raw = r.get("_raw", {})
+        cm_email = raw.get("CustomerAccountManagerEmail") or "—"
+        cm_name  = raw.get("CustomerAccountManagerName") or cm_email
+        cm_display_names[cm_email] = cm_name
+        c = raw.get("OnlyOnStatusChange_DatesDiffInWeeks")
+        try:
+            c = int(float(c)) if c is not None else 0
+        except (ValueError, TypeError):
+            c = 0
+        bucket = str(c) if c <= 4 else "5+"
+        cm_data[cm_email][bucket] += 1
+
+    # שורת סיכום כללי
+    total_buckets = Counter()
+    for buckets in cm_data.values():
+        for b, v in buckets.items():
+            total_buckets[b] += v
+    total_all = sum(total_buckets.values())
+    _tcell(ws, row, 1, "סה\"כ כולל")
+    _dcell(ws, row, 2, total_all)
+    for bi, bucket in enumerate(["1", "2", "3", "4", "5+"], 3):
+        _dcell(ws, row, bi, total_buckets.get(bucket, 0))
+    row += 1
+
+    for cm_email, buckets in sorted(cm_data.items(), key=lambda x: -sum(x[1].values())):
+        total = sum(buckets.values())
+        name  = cm_display_names.get(cm_email, cm_email)
+        _dcell(ws, row, 1, name)
+        _dcell(ws, row, 2, total)
+        for bi, bucket in enumerate(["1", "2", "3", "4", "5+"], 3):
+            _dcell(ws, row, bi, buckets.get(bucket, 0))
+        row += 1
+    row += 1
+
+    # ---- טבלה 6: טופ 20 מעסיקים לפי הסלמה ----
     headers = ["מעסיק", "ח.פ", "סה\"כ", "שבוע 1", "שבוע 2", "שבוע 3", "שבוע 4", "שבוע 5+"]
     for i, h in enumerate(headers, 1):
         _tcell(ws, row, i, h)
