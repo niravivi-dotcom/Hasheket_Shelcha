@@ -135,9 +135,11 @@ def run_pilot_from_api_v2():
     if not access_token or not api_base:
         return jsonify({"ok": False, "message": "חסרים שדות access_token ו/או api_base"}), 400
 
-    start_date = request.form.get("start_date", "2022-01-01").strip().lstrip("=")
-    top        = request.form.get("top", "10000").strip().lstrip("=")
-    acct_mgr   = request.form.get("account_manager_email", "").strip().lstrip("=")
+    start_date   = request.form.get("start_date", "2022-01-01").strip().lstrip("=")
+    top          = request.form.get("top", "10000").strip().lstrip("=")
+    acct_mgr_raw = request.form.get("account_manager_email", "").strip().lstrip("=")
+    # תמיכה ברשימה מופרדת בפסיקים — קריאה נפרדת לכל מנהלת תיק
+    acct_mgr_list = [m.strip() for m in acct_mgr_raw.split(",") if m.strip()]
 
     mapping_file = request.files.get("mapping")
     if mapping_file is None:
@@ -145,7 +147,20 @@ def run_pilot_from_api_v2():
 
     # --- שלב 1: fetch ---
     try:
-        records_list = _fetch_david_records(api_base, access_token, start_date, top, acct_mgr)
+        if acct_mgr_list:
+            # קריאה נפרדת לכל מנהלת תיק, איחוד לפי MISPAR_MEZAHE_RESHUMA
+            merged = {}
+            for mgr in acct_mgr_list:
+                recs = _fetch_david_records(api_base, access_token, start_date, top, mgr)
+                for r in recs:
+                    rid = r.get("MISPAR_MEZAHE_RESHUMA")
+                    if rid:
+                        merged[rid] = r
+            records_list = list(merged.values())
+            print(f"[v2] fetched via {len(acct_mgr_list)} managers: {len(records_list)} unique records")
+        else:
+            # ללא פילטור — כל הרשומות
+            records_list = _fetch_david_records(api_base, access_token, start_date, top, "")
     except Exception as e:
         return jsonify({"ok": False, "message": f"שגיאה בקריאת API של דוד: {e}"}), 502
 
