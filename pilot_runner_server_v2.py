@@ -27,7 +27,7 @@ sys.path.insert(0, str(APP_DIR))
 
 # engine v2 modules
 from mapping_loader    import load_mapping
-from record_classifier import classify_all
+from record_classifier import classify_all, apply_employer_max_counter_routing
 from record_grouper    import group_records, summarize_groups
 from email_builder     import build_all_emails
 from gmail_sender      import send_all_groups, summarize_results
@@ -180,6 +180,12 @@ def run_pilot_from_api_v2():
         return jsonify({"ok": False, "message": f"שגיאה בסיווג רשומות: {e}"}), 500
 
     print(f"[v2] classified={len(classified)} skipped={len(skipped_list)}")
+
+    # --- שלב 3.5: employer max-counter routing ---
+    try:
+        classified = apply_employer_max_counter_routing(classified)
+    except Exception as e:
+        return jsonify({"ok": False, "message": f"שגיאה ב-employer routing override: {e}"}), 500
 
     # --- שלב 4: group ---
     try:

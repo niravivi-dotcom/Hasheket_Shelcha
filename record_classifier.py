@@ -343,3 +343,56 @@ def classify_all(records, mapping):
         else:
             classified.append(result)
     return classified, skipped
+
+
+def apply_employer_max_counter_routing(classified_records):
+    """
+    לוגיקת "מעסיק = לקוח, לא להציף":
+
+    עבור אותו עובד + קופה + קוד שגיאה שיש לו רשומות בגילאים (counters) שונים —
+    מנתב את כולן לפי ה-counter המקסימלי ביניהן.
+
+    רציונל: אם המעסיק כבר קיבל התראה על אותה בעיה בחודש שכר קודם,
+    אין טעם לשלוח מייל נוסף על חודש חדש — הטיפול יהיה לפי הסטטוס הגבוה ביותר.
+
+    כלל:
+      max counter >= 3  →  כל הרשומות בקבוצה עוברות למנהלת תיק
+      max counter < 3   →  נשאר כמו שהוא (המעסיק, routing רגיל)
+
+    מופעל אחרי classify_all(), לפני group_records().
+    """
+    from mapping_loader import FORMAT_EMPLOYER, FORMAT_CASE_MGR
+
+    # בניית מיפוי: (employee_id, fund_id, error_code) → [indices]
+    # רק רשומות מעסיק (לא כאלה שכבר הוסלמו למנהלת תיק)
+    employer_groups = {}
+    for i, rec in enumerate(classified_records):
+        if rec.get("email_format") != FORMAT_EMPLOYER:
+            continue
+        emp_id  = str(rec.get("employee_id") or "")
+        fund_id = str(rec.get("fund_institution_id") or "")
+        ec      = str(rec.get("error_code") or "")
+        if not emp_id or not fund_id or not ec:
+            continue
+        key = (emp_id, fund_id, ec)
+        employer_groups.setdefault(key, []).append(i)
+
+    # עדכון ניתוב לפי max counter
+    for key, indices in employer_groups.items():
+        if len(indices) <= 1:
+            continue  # רשומה בודדת — אין מה להשוות
+
+        max_counter = max(
+            classified_records[i].get("counter_weeks") or 0
+            for i in indices
+        )
+
+        if max_counter >= 3:
+            for i in indices:
+                classified_records[i]["email_format"]  = FORMAT_CASE_MGR
+                classified_records[i]["responsibility"] = RESP_CASE_MANAGER
+                classified_records[i]["to_role"]        = "מנהלת תיק"
+                classified_records[i]["cc_role"]        = None
+                classified_records[i]["routing_path"]   = f"employer_max_counter_{max_counter}"
+
+    return classified_records
