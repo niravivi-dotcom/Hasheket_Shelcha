@@ -74,7 +74,7 @@ def _fetch_david_records(api_base, access_token, start_date, top, acct_mgr):
             "Content-Type":   "application/json",
         },
         json=body,
-        timeout=120,
+        timeout=300,
     )
     resp.raise_for_status()
     data = resp.json()
