@@ -3,20 +3,12 @@ email_builder.py
 ----------------
 בונה תוכן מייל לכל EmailGroup לפי פורמט.
 
-מחזיר EmailContent dict:
-{
-    "subject":     str,
-    "body_html":   str,
-    "to_email":    str | None,
-    "cc_email":    str | None,
-    "attachments": [{"filename": str, "data": bytes, "mimetype": str}, ...]
-}
-
 פורמטים נתמכים:
-  מוסדי-1  — רשימת שמות קבצים + ת.ז. חד-ערכיים
-  מוסדי-2  — פורמט לקוד שגיאה 26
-  מעסיק    — HTML table + Excel מצורף
-  מנהלת תיק — Excel עם כל שדות API
+  מוסדי-1  -- רשימת שמות קבצים + ת.ז. חד-ערכיים
+  מוסדי-2  -- פורמט לקוד שגיאה 26
+  מוסדי-3  -- קרן פנסיה ברירת מחדל (ספרת ביקורת)
+  מעסיק    -- HTML table + Excel מצורף
+  מנהלת תיק -- Excel עם כל שדות API
 """
 
 import io
@@ -24,12 +16,11 @@ from datetime import date
 import pandas as pd
 
 from mapping_loader import (
-    FORMAT_MOSADI_1, FORMAT_MOSADI_2,
+    FORMAT_MOSADI_1, FORMAT_MOSADI_2, FORMAT_MOSADI_3,
     FORMAT_EMPLOYER, FORMAT_CASE_MGR,
 )
 
 
-# ---- תבנית CSS בסיסית ל-HTML מיילים ----
 _HTML_STYLE = """
 <style>
   body { font-family: Arial, sans-serif; direction: rtl; text-align: right; font-size: 14px; color: #333; }
@@ -44,25 +35,19 @@ _HTML_STYLE = """
 _MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
-# =============================================================================
-# Public API
-# =============================================================================
-
 def build_email(group, mapping):
-    """
-    מקבל EmailGroup dict (מ-record_grouper) ומחזיר EmailContent dict.
-    קבוצות מנהלת תיק מדולגות — מטופלות ב-report_builder.
-    """
     fmt = group.get("email_format", "")
 
     if fmt == FORMAT_MOSADI_1:
         content = _build_mosadi_1(group, mapping)
     elif fmt == FORMAT_MOSADI_2:
         content = _build_mosadi_2(group, mapping)
+    elif fmt == FORMAT_MOSADI_3:
+        content = _build_mosadi_3(group, mapping)
     elif fmt == FORMAT_EMPLOYER:
         content = _build_employer(group, mapping)
     else:
-        return None  # מנהלת תיק — מטופל ב-report_builder
+        return None  # מנהלת תיק -- מטופל ב-report_builder
 
     if content is not None:
         content["account_manager_email"] = group.get("meta", {}).get("account_manager_email")
@@ -70,11 +55,6 @@ def build_email(group, mapping):
 
 
 def build_all_emails(groups, mapping):
-    """
-    בונה EmailContent לכל קבוצה (מוסדי + מעסיק בלבד).
-    מחזיר רשימת (group, email_content) tuples.
-    skips = מספר קבוצות שנכשלו.
-    """
     results = []
     skipped = 0
     for g in groups:
@@ -82,7 +62,7 @@ def build_all_emails(groups, mapping):
             content = build_email(g, mapping)
             results.append((g, content))
         except Exception as e:
-            print(f"[WARN] email_builder: skip group {g.get('group_key')} — {e}")
+            print(f"[WARN] email_builder: skip group {g.get('group_key')} -- {e}")
             skipped += 1
     return results, skipped
 
@@ -101,12 +81,10 @@ def _build_mosadi_1(group, mapping):
 
     subject = f"[מוסדי] {customer_number} {customer_name}".strip()
 
-    # שמות קבצים חד-ערכיים
     file_names = sorted({
         r.get("original_file_name") for r in records
         if r.get("original_file_name")
     })
-    # ת.ז. עובדים חד-ערכיים
     employee_ids = sorted({
         str(r.get("employee_id")) for r in records
         if r.get("employee_id")
@@ -150,7 +128,6 @@ def _build_mosadi_2(group, mapping):
 
     subject = f"[מוסדי] {customer_number} {customer_name}".strip()
 
-    # לכל עובד ייחודי: שם מלא + ת.ז + שם קובץ
     employee_rows = ""
     file_names = sorted({r.get("original_file_name") for r in records if r.get("original_file_name")})
     seen_ids = set()
@@ -159,8 +136,8 @@ def _build_mosadi_2(group, mapping):
         if not emp_id or emp_id in seen_ids:
             continue
         seen_ids.add(emp_id)
-        name = r.get("full_name") or "—"
-        employee_rows += f"<li>{name} — ת.ז. {emp_id}</li>"
+        name = r.get("full_name") or "---"
+        employee_rows += f"<li>{name} -- ת.ז. {emp_id}</li>"
 
     files_html = _ul_list(file_names, label="שמות הקבצים:")
 
@@ -172,6 +149,53 @@ def _build_mosadi_2(group, mapping):
   תחת המעסיק. ע"פ הנחיות אגף שוק ההון ביטוח וחיסכון במשרד האוצר לא נדרש ביצוע קבלת בעלות
   בקרן פנסיה. כל הפרטים לקבלת בעלות נמצאים בממשק שדווח אליכם.</p>
   <ul>{employee_rows}</ul>
+  {files_html}
+  {_signature()}
+</body>
+"""
+    return {
+        "subject":     subject,
+        "body_html":   body_html,
+        "to_email":    None,
+        "cc_email":    None,
+        "attachments": [],
+    }
+
+
+# =============================================================================
+# מוסדי-3 -- קרן פנסיה ברירת מחדל
+# =============================================================================
+
+def _build_mosadi_3(group, mapping):
+    records = group["records"]
+    meta    = group["meta"]
+
+    customer_number = meta.get("customer_number", "")
+    customer_name   = meta.get("customer_name") or ""
+    fund_name       = meta.get("fund_institution_name") or ""
+
+    subject = f"[מוסדי] {customer_number} {customer_name}".strip()
+
+    employee_ids = sorted({
+        str(r.get("employee_id")) for r in records
+        if r.get("employee_id")
+    })
+    file_names = sorted({
+        r.get("original_file_name") for r in records
+        if r.get("original_file_name")
+    })
+
+    ids_html   = _ul_list(employee_ids, label="מספרי זהות עובדים:")
+    files_html = _ul_list(file_names, label="שמות הקבצים שדווחו:")
+
+    body_html = f"""
+{_HTML_STYLE}
+<body dir="rtl">
+  <p>שלום,</p>
+  <p>על פי נהלי קרן ברירת מחדל, העובדים המפורטים להלן משויכים לקרן
+  <strong>{fund_name}</strong> כקרן ברירת המחדל עבור המעסיק <strong>{customer_number}</strong>.
+  התקבל היזון חוזר המעיד כי הכספים טרם נקלטו בקרן. נבקשכם לבדוק את הנושא ולטפל בהתאם.</p>
+  {ids_html}
   {files_html}
   {_signature()}
 </body>
@@ -200,7 +224,6 @@ def _build_employer(group, mapping):
     intro  = "שלום,\n\nמצורפים למייל זה תשובות הקופות לגבי קליטת הכספים לקופות העובדים. האם ידוע ובטיפול?"
     footer = "בכל שאלה נשמח לסייע."
 
-    # HTML table
     table_html = _employer_table(records)
 
     body_html = f"""
@@ -213,7 +236,6 @@ def _build_employer(group, mapping):
 </body>
 """
 
-    # Excel מצורף
     xlsx_data     = _employer_excel(records)
     xlsx_filename = f"שגיאות_פנסיה_{customer}.xlsx"
 
@@ -233,7 +255,6 @@ def _build_employer(group, mapping):
 
 
 def _dedup_records(records):
-    """מחזיר רשומות ייחודיות לפי (ת.ז., קוד שגיאה) — שומר סדר הופעה ראשון."""
     seen = set()
     result = []
     for r in records:
@@ -245,13 +266,12 @@ def _dedup_records(records):
 
 
 def _employer_table(records):
-    """HTML table: ת.ז., שם מלא, שם קופה, סוג קופה, תיאור שגיאה, טיפול נדרש, חודש שכר."""
     rows_html = ""
     for r in _dedup_records(records):
         emp_id    = r.get("employee_id") or ""
-        name      = r.get("full_name") or "—"
-        fund_name = r.get("fund_institution_name") or "—"
-        fund_type = r.get("fund_institution_type") or "—"
+        name      = r.get("full_name") or "---"
+        fund_name = r.get("fund_institution_name") or "---"
+        fund_type = r.get("fund_institution_type") or "---"
         desc      = r.get("error_description") or ""
         action    = r.get("explanation_employer") or ""
         chodesh   = r.get("_raw", {}).get("CHODESH_MASKORET") or ""
@@ -285,7 +305,6 @@ def _employer_table(records):
 
 
 def _employer_excel(records):
-    """בונה Excel (bytes) לקבוצת מעסיק."""
     rows = []
     for r in _dedup_records(records):
         rows.append({
@@ -296,7 +315,7 @@ def _employer_excel(records):
             "תיאור שגיאה":   r.get("error_description"),
             "טיפול נדרש":    r.get("explanation_employer"),
             "חודש שכר":      r.get("_raw", {}).get("CHODESH_MASKORET"),
-            "מס' לקוח":      r.get("customer_number"),
+            "מס לקוח":       r.get("customer_number"),
             "שם קובץ מקור":  r.get("original_file_name"),
             "תיק מסלקה":     r.get("tik_mislaka"),
         })
@@ -308,14 +327,11 @@ def _employer_excel(records):
     return bio.getvalue()
 
 
-
-
 # =============================================================================
 # Helpers
 # =============================================================================
 
 def _render_subject(template_str, meta):
-    """מחליף placeholders בנושא המייל לפי meta."""
     if not template_str:
         return None
     s = template_str
@@ -324,11 +340,6 @@ def _render_subject(template_str, meta):
     s = s.replace("{fund_institution_name}", str(meta.get("fund_institution_name") or ""))
     s = s.replace("{fund_institution_id}",   str(meta.get("fund_institution_id") or ""))
     return s.strip() or None
-
-
-def _default_subject_mosadi(meta):
-    name = meta.get("fund_institution_name") or meta.get("fund_institution_id") or ""
-    return f"פידבק שגיאות פנסיה — {name}".strip()
 
 
 def _ul_list(items, label=""):
@@ -340,7 +351,6 @@ def _ul_list(items, label=""):
 
 
 def _nl2br(text):
-    """ממיר ירידת שורה ל-<br>."""
     return (text or "").replace("\n", "<br>\n")
 
 

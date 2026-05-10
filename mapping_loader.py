@@ -17,6 +17,7 @@ SHEET_TEMPLATES    = "תבניות מייל"
 # ערכי פורמט מייל (מפתח לגיליון 4)
 FORMAT_MOSADI_1    = "מוסדי-1"
 FORMAT_MOSADI_2    = "מוסדי-2"
+FORMAT_MOSADI_3    = "מוסדי-3"   # קרן פנסיה ברירת מחדל (ספרת ביקורת)
 FORMAT_EMPLOYER    = "מעסיק"
 FORMAT_CASE_MGR    = "מנהלת תיק"
 FORMAT_EXCLUDED    = "מוחרג"
@@ -37,8 +38,22 @@ RESPONSIBILITY_MAP = {
     "סוכן":         RESP_AGENT,
 }
 
-# TODO: כאשר שדה סוג מוצר יגיע מדוד — להוסיף כאן את קוד קרן פנסיה
-PENSION_FUND_PRODUCT_CODE = None  # stub
+# מיפוי ספרת ביקורת → קרן פנסיה ברירת מחדל (מוסדי-3)
+# ספרה אחרונה של ת.ז. → (IncomeTaxAuthorizationNumber, FundInstitutionIdentityNumber)
+DEFAULT_FUND_MAP = {
+    0: {"income_tax_auth": "163",   "fund_id": "512065202"},   # אייל
+    1: {"income_tax_auth": "163",   "fund_id": "512065202"},   # אייל
+    2: {"income_tax_auth": "1328",  "fund_id": "513173393"},   # אלטשולר שחם
+    3: {"income_tax_auth": "1328",  "fund_id": "513173393"},   # אלטשולר שחם
+    4: {"income_tax_auth": "13908", "fund_id": "514956465"},   # מור
+    5: {"income_tax_auth": "13908", "fund_id": "514956465"},   # מור
+    6: {"income_tax_auth": "13908", "fund_id": "514956465"},   # מור
+    7: {"income_tax_auth": "14036", "fund_id": "513621110"},   # אינפיניטי
+    8: {"income_tax_auth": "14036", "fund_id": "513621110"},   # אינפיניטי
+    9: {"income_tax_auth": "14036", "fund_id": "513621110"},   # אינפיניטי
+}
+
+PENSION_FUND_PRODUCT_CODE = None  # stub — לא בשימוש (הוחלף ב-DEFAULT_FUND_MAP)
 
 
 def _clean(val):
