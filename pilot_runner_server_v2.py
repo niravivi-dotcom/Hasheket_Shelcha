@@ -15,12 +15,26 @@ import io
 import base64
 import json
 import sys
+import time
 import traceback
+import logging
 from datetime import datetime
 from pathlib import Path
 
 import requests
 from flask import Flask, jsonify, request
+
+# =============================================================================
+# Logging — stdout עם timestamps (נקרא ב-Cloud Run Logs)
+# =============================================================================
+logging.basicConfig(
+    level=logging.INFO,
+    stream=sys.stdout,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    force=True,
+)
+log = logging.getLogger(__name__)
 
 APP_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(APP_DIR))
@@ -49,8 +63,41 @@ def _load_service_account():
     try:
         return json.loads(base64.b64decode(raw))
     except Exception as e:
-        print(f"[WARN] לא הצלחתי לטעון GMAIL_SERVICE_ACCOUNT_B64: {e}")
+        log.warning(f"לא הצלחתי לטעון GMAIL_SERVICE_ACCOUNT_B64: {e}")
         return None
+
+
+def _send_failure_alert(step: str, error: str, service_account_info: dict,
+                        sender: str = None, recipient: str = "niravivi@gmail.com"):
+    """שולח מייל התראה כשה-pipeline נופל."""
+    if not service_account_info or not sender:
+        log.warning("Alert email דולג — אין service account או sender")
+        return
+    try:
+        import email.message
+        from googleapiclient.discovery import build
+        from google.oauth2 import service_account as sa
+
+        creds = sa.Credentials.from_service_account_info(
+            service_account_info,
+            scopes=["https://www.googleapis.com/auth/gmail.send"],
+        ).with_subject(sender)
+        service = build("gmail", "v1", credentials=creds, cache_discovery=False)
+
+        msg = email.message.EmailMessage()
+        msg["Subject"] = f"[hspension] Pipeline כשל — {step}"
+        msg["From"]    = sender
+        msg["To"]      = recipient
+        msg.set_content(
+            f"הפייפליין נפל בשלב: {step}\n\n"
+            f"שגיאה:\n{error}\n\n"
+            f"זמן (UTC): {datetime.utcnow().isoformat()}Z"
+        )
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+        service.users().messages().send(userId=sender, body={"raw": raw}).execute()
+        log.info(f"Alert email נשלח ל-{recipient}")
+    except Exception as e:
+        log.warning(f"שליחת alert email נכשלה: {e}")
 
 
 def _check_api_key():
@@ -124,6 +171,9 @@ def run_pilot_from_api_v2():
         "update_chunks":  [ [chunk], ... ],
     }
     """
+    run_start = time.time()
+    log.info("=== pipeline v2 התחיל ===")
+
     # --- auth ---
     err = _check_api_key()
     if err:
@@ -135,76 +185,103 @@ def run_pilot_from_api_v2():
     if not access_token or not api_base:
         return jsonify({"ok": False, "message": "חסרים שדות access_token ו/או api_base"}), 400
 
-    start_date   = request.form.get("start_date", "2022-01-01").strip().lstrip("=")
-    top          = request.form.get("top", "10000").strip().lstrip("=")
-    acct_mgr_raw = request.form.get("account_manager_email", "").strip().lstrip("=")
-    # תמיכה ברשימה מופרדת בפסיקים — קריאה נפרדת לכל מנהלת תיק
+    start_date    = request.form.get("start_date", "2022-01-01").strip().lstrip("=")
+    top           = request.form.get("top", "10000").strip().lstrip("=")
+    acct_mgr_raw  = request.form.get("account_manager_email", "").strip().lstrip("=")
     acct_mgr_list = [m.strip() for m in acct_mgr_raw.split(",") if m.strip()]
 
     mapping_file = request.files.get("mapping")
     if mapping_file is None:
         return jsonify({"ok": False, "message": "חסר קובץ mapping בבקשה"}), 400
 
+    service_account_info = _load_service_account()
+    alert_sender = acct_mgr_list[0] if acct_mgr_list else None
+
+    def _alert(step, err_msg):
+        log.error(f"[FAIL] {step}: {err_msg}")
+        _send_failure_alert(step, err_msg, service_account_info, sender=alert_sender)
+
     # --- שלב 1: fetch ---
+    log.info(f"שלב 1: fetch — managers={acct_mgr_list}, start_date={start_date}, top={top}")
+    t0 = time.time()
     try:
         if acct_mgr_list:
-            # קריאה נפרדת לכל מנהלת תיק, איחוד לפי MISPAR_MEZAHE_RESHUMA
             merged = {}
             for mgr in acct_mgr_list:
+                log.info(f"  קורא GetFeedbackData עבור {mgr}")
                 recs = _fetch_david_records(api_base, access_token, start_date, top, mgr)
+                log.info(f"  {mgr} → {len(recs)} רשומות")
                 for r in recs:
                     rid = r.get("MISPAR_MEZAHE_RESHUMA")
                     if rid:
                         merged[rid] = r
             records_list = list(merged.values())
-            print(f"[v2] fetched via {len(acct_mgr_list)} managers: {len(records_list)} unique records")
         else:
-            # ללא פילטור — כל הרשומות
             records_list = _fetch_david_records(api_base, access_token, start_date, top, "")
     except Exception as e:
+        err_msg = f"{e}\n{traceback.format_exc()}"
+        _alert("fetch מ-API של דוד", err_msg)
         return jsonify({"ok": False, "message": f"שגיאה בקריאת API של דוד: {e}"}), 502
 
     fetched = len(records_list)
-    print(f"[v2] fetched={fetched} records")
+    log.info(f"שלב 1 הסתיים: fetched={fetched} ({time.time()-t0:.1f}s)")
 
     # --- שלב 2: load mapping ---
+    log.info("שלב 2: טעינת mapping")
+    t0 = time.time()
     try:
         mapping = load_mapping(io.BytesIO(mapping_file.read()))
     except Exception as e:
+        err_msg = f"{e}\n{traceback.format_exc()}"
+        _alert("טעינת mapping", err_msg)
         return jsonify({"ok": False, "message": f"שגיאה בטעינת mapping: {e}"}), 400
+    log.info(f"שלב 2 הסתיים ({time.time()-t0:.1f}s)")
 
     # --- שלב 3: classify ---
+    log.info("שלב 3: classify")
+    t0 = time.time()
     try:
         classified, skipped_list = classify_all(records_list, mapping)
     except Exception as e:
+        err_msg = f"{e}\n{traceback.format_exc()}"
+        _alert("סיווג רשומות", err_msg)
         return jsonify({"ok": False, "message": f"שגיאה בסיווג רשומות: {e}"}), 500
-
-    print(f"[v2] classified={len(classified)} skipped={len(skipped_list)}")
+    log.info(f"שלב 3 הסתיים: classified={len(classified)} skipped={len(skipped_list)} ({time.time()-t0:.1f}s)")
 
     # --- שלב 3.5: employer max-counter routing ---
     try:
         classified = apply_employer_max_counter_routing(classified)
     except Exception as e:
+        err_msg = f"{e}\n{traceback.format_exc()}"
+        _alert("employer max-counter routing", err_msg)
         return jsonify({"ok": False, "message": f"שגיאה ב-employer routing override: {e}"}), 500
 
     # --- שלב 4: group ---
+    log.info("שלב 4: group")
+    t0 = time.time()
     try:
         groups = group_records(classified)
     except Exception as e:
+        err_msg = f"{e}\n{traceback.format_exc()}"
+        _alert("קיבוץ רשומות", err_msg)
         return jsonify({"ok": False, "message": f"שגיאה בקיבוץ: {e}"}), 500
-
-    print(f"[v2] groups={len(groups)} — {summarize_groups(groups)}")
+    log.info(f"שלב 4 הסתיים: groups={len(groups)} ({time.time()-t0:.1f}s)")
 
     # --- שלב 5: build emails ---
+    log.info("שלב 5: build emails")
+    t0 = time.time()
     try:
         email_results, build_skipped = build_all_emails(groups, mapping)
     except Exception as e:
+        err_msg = f"{e}\n{traceback.format_exc()}"
+        _alert("בניית מיילים", err_msg)
         return jsonify({"ok": False, "message": f"שגיאה בבניית מיילים: {e}"}), 500
+    log.info(f"שלב 5 הסתיים ({time.time()-t0:.1f}s)")
 
     # --- שלב 6: send / create drafts ---
-    service_account_info = _load_service_account()
-    default_impersonate  = os.environ.get("TEST_GMAIL_IMPERSONATE", acct_mgr_list[0] if acct_mgr_list else "")
-
+    log.info("שלב 6: יצירת drafts ב-Gmail")
+    t0 = time.time()
+    default_impersonate = os.environ.get("TEST_GMAIL_IMPERSONATE", acct_mgr_list[0] if acct_mgr_list else "")
     try:
         send_results, send_skipped = send_all_groups(
             email_results,
@@ -212,18 +289,23 @@ def run_pilot_from_api_v2():
             default_impersonate,
         )
     except Exception as e:
+        err_msg = f"{e}\n{traceback.format_exc()}"
+        _alert("יצירת Gmail drafts", err_msg)
         return jsonify({"ok": False, "message": f"שגיאה ביצירת drafts: {e}"}), 500
 
     gmail_summary = summarize_results(send_results)
-    print(f"[v2] gmail: {gmail_summary}")
+    log.info(f"שלב 6 הסתיים: {gmail_summary} ({time.time()-t0:.1f}s)")
 
     # --- שלב 7: build payload ---
+    log.info("שלב 7: build payload")
+    t0 = time.time()
     try:
         payload_result = build_payload(send_results, classified, skipped_records=skipped_list)
     except Exception as e:
+        err_msg = f"{e}\n{traceback.format_exc()}"
+        _alert("בניית payload", err_msg)
         return jsonify({"ok": False, "message": f"שגיאה בבניית payload: {e}"}), 500
-
-    print(f"[v2] payload: {summarize_payload(payload_result)}")
+    log.info(f"שלב 7 הסתיים: {summarize_payload(payload_result)} ({time.time()-t0:.1f}s)")
 
     # --- דו"ח סיכום ---
     import base64 as _b64
@@ -232,15 +314,18 @@ def run_pilot_from_api_v2():
         report_bytes = build_run_report(groups, send_results, skipped_records=skipped_list, raw_records=records_list, run_date=run_dt)
         report_b64 = _b64.b64encode(report_bytes).decode("utf-8")
     except Exception as e:
-        print(f"[v2] report build failed: {e}")
+        log.warning(f"report build failed: {e}")
         report_b64 = None
 
     # --- דוחות למנהלות תיק ---
     try:
         cm_reports = build_case_manager_reports(groups, send_results, skipped_records=skipped_list, run_date=run_dt)
     except Exception as e:
-        print(f"[v2] case manager reports failed: {e}")
+        log.warning(f"case manager reports failed: {e}")
         cm_reports = []
+
+    total_time = time.time() - run_start
+    log.info(f"=== pipeline v2 הסתיים בהצלחה — {total_time:.1f}s כולל ===")
 
     return jsonify({
         "ok":      True,
@@ -254,6 +339,7 @@ def run_pilot_from_api_v2():
             "emails_fail":    gmail_summary["failed"],
             "payload_total":  payload_result["total"],
             "payload_chunks": len(payload_result["chunks"]),
+            "total_seconds":  round(total_time, 1),
         },
         "send_results":       send_results,
         "update_payload":     payload_result["payload"],

@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>השקט שלך — סקירת מערכת אוטומציה</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #2D5F3E;
+    --purple: #9B7EBD;
+    --teal: #5FB3B3;
+    --dark: #1A2332;
+    --white: #FFFFFF;
+    --off-white: #F5F5F5;
+    --border: #E5E7EB;
+    --text: #2C3E50;
+    --text-light: #5D6D7E;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Heebo', sans-serif;
+    background: var(--off-white);
+    color: var(--text);
+    direction: rtl;
+    text-align: right;
+    line-height: 1.7;
+  }
+  /* Header */
+  .page-header {
+    background: linear-gradient(135deg, var(--dark) 0%, var(--green) 100%);
+    color: white;
+    padding: 3rem 4rem;
+  }
+  .page-header h1 {
+    font-size: clamp(1.8rem, 3vw, 2.8rem);
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+  }
+  .page-header .sub {
+    font-size: 1rem;
+    opacity: 0.75;
+    font-weight: 300;
+  }
+  .badge {
+    display: inline-block;
+    background: var(--teal);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.2rem 0.8rem;
+    border-radius: 20px;
+    margin-top: 1rem;
+  }
+  /* Layout */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+  }
+  /* Section */
+  .section { margin-bottom: 3rem; }
+  .section-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--green);
+    border-bottom: 3px solid var(--green);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+  /* Card */
+  .card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    border-right: 4px solid var(--green);
+    margin-bottom: 1rem;
+  }
+  .card.purple { border-right-color: var(--purple); }
+  .card.teal   { border-right-color: var(--teal); }
+  .card.red    { border-right-color: #e74c3c; }
+  .card h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--dark);
+  }
+  .card p, .card li { font-size: 0.95rem; color: var(--text); }
+  .card ul { padding-right: 1.2rem; }
+  .card ul li { margin-bottom: 0.3rem; }
+  /* Grid */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  @media (max-width: 768px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .page-header { padding: 2rem; }
+  }
+  /* Flow diagram */
+  .flow {
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    padding: 1.5rem 0;
+    flex-wrap: nowrap;
+  }
+  .flow-node {
+    background: white;
+    border: 2px solid var(--green);
+    border-radius: 10px;
+    padding: 0.8rem 1rem;
+    text-align: center;
+    font-size: 0.82rem;
+    font-weight: 600;
+    min-width: 110px;
+    flex-shrink: 0;
+    color: var(--dark);
+  }
+  .flow-node .host {
+    font-size: 0.68rem;
+    font-weight: 400;
+    color: var(--text-light);
+    margin-top: 0.2rem;
+  }
+  .flow-node.purple { border-color: var(--purple); }
+  .flow-node.teal   { border-color: var(--teal); }
+  .flow-node.dark   { background: var(--dark); color: white; border-color: var(--dark); }
+  .flow-node.dark .host { color: rgba(255,255,255,0.6); }
+  .flow-arrow {
+    font-size: 1.2rem;
+    color: var(--text-light);
+    flex-shrink: 0;
+    padding: 0 0.3rem;
+  }
+  /* Table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+  }
+  th {
+    background: var(--green);
+    color: white;
+    padding: 0.7rem 1rem;
+    font-weight: 600;
+    text-align: right;
+  }
+  td {
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: var(--off-white); }
+  /* Code block */
+  .code-block {
+    background: var(--dark);
+    color: #a8d8a8;
+    border-radius: 8px;
+    padding: 1.2rem 1.5rem;
+    font-family: monospace;
+    font-size: 0.85rem;
+    direction: ltr;
+    text-align: left;
+    overflow-x: auto;
+    line-height: 1.6;
+  }
+  .code-key   { color: #88bfff; }
+  .code-str   { color: #ffd580; }
+  .code-num   { color: #f8c8a0; }
+  .code-comment { color: #6a9955; }
+  /* Email mockup */
+  .email-mock {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    font-size: 0.9rem;
+  }
+  .email-mock-header {
+    background: #f1f3f4;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .email-mock-header .row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.2rem;
+    font-size: 0.88rem;
+  }
+  .email-mock-header .label { color: var(--text-light); min-width: 60px; }
+  .email-mock-header .val   { color: var(--dark); font-weight: 500; }
+  .email-mock-body {
+    padding: 1.5rem;
+    background: white;
+    direction: rtl;
+  }
+  .email-mock-body table {
+    margin-top: 1rem;
+    font-size: 0.85rem;
+  }
+  .email-mock-body table th { font-size: 0.82rem; }
+  /* Open issue tag */
+  .tag {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15rem 0.6rem;
+    border-radius: 12px;
+    margin-inline-start: 0.4rem;
+    vertical-align: middle;
+  }
+  .tag.open   { background: #fde8e8; color: #c0392b; }
+  .tag.flow   { background: #e8f4e8; color: var(--green); }
+  .tag.david  { background: #e8eaf6; color: #3949ab; }
+  .tag.shahar { background: #fff3e0; color: #e65100; }
+  /* Credential pill */
+  .cred {
+    display: inline-block;
+    background: #eef2ff;
+    color: #3949ab;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.15rem 0.6rem;
+    border-radius: 6px;
+    margin: 0.15rem 0.1rem;
+    font-family: monospace;
+  }
+  .note {
+    background: #fffbeb;
+    border-right: 3px solid #f59e0b;
+    padding: 0.8rem 1rem;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.88rem;
+    color: var(--text);
+    margin-top: 1rem;
+  }
+  .answer-box {
+    background: #edfdf4;
+    border-right: 4px solid var(--green);
+    padding: 1rem 1.5rem;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.92rem;
+  }
+  .answer-box strong { color: var(--green); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  .mini-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-light);
+    margin-bottom: 0.5rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>השקט שלך — מערכת אוטומציה להיזון חוזר פנסיוני</h1>
+  <div class="sub">סקירה טכנית לישיבת עבודה | Spring AI × hspension</div>
+  <div class="badge">גרסת טסט · מרץ 2026</div>
+</div>
+
+<div class="container">
+
+  <!-- ===== 1. FLOW ===== -->
+  <div class="section">
+    <div class="section-title">תרשים זרימה</div>
+    <div class="card" style="overflow-x:auto; padding: 1.5rem;">
+      <div class="flow">
+        <div class="flow-node dark">API של דוד<div class="host">portalstage.hspension</div></div>
+        <div class="flow-arrow">←</div>
+        <div class="flow-node">n8n Cloud<div class="host">חשבון hspension</div></div>
+        <div class="flow-arrow">←</div>
+        <div class="flow-node purple">Google Drive<div class="host">קובץ מיפוי שגיאות</div></div>
+        <div class="flow-arrow">←</div>
+        <div class="flow-node teal">Render.com<div class="host">Python Engine</div></div>
+        <div class="flow-arrow">←</div>
+        <div class="flow-node">Gmail<div class="host">תיבות מנהלות תיק</div></div>
+      </div>
+      <div style="margin-top:1rem; font-size:0.85rem; color:var(--text-light);">
+        n8n שולף נתונים מדוד ← ממזג עם קובץ מיפוי מ-Drive ← שולח ל-Render לעיבוד ← Render יוצר טיוטות Gmail ישירות ← n8n מחזיר סטטוס לדוד
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 2. COMPONENTS ===== -->
+  <div class="section">
+    <div class="section-title">רכיבים ו-Credentials</div>
+    <div class="grid-2">
+
+      <div class="card">
+        <h3>n8n Cloud — חשבון hspension</h3>
+        <p>אורקסטרציה: מריץ את כל הזרימה בתזמון שבועי.</p>
+        <ul style="margin-top:0.8rem;">
+          <li>שולף נתונים מ-API של דוד (עד 1,000 רשומות)</li>
+          <li>מרענן token לפני כל ריצה</li>
+          <li>מוריד קובץ מיפוי שגיאות מ-Drive</li>
+          <li>שולח לעיבוד ב-Render</li>
+          <li>מחזיר סטטוס לדוד per-record</li>
+        </ul>
+        <div style="margin-top:1rem;">
+          <div class="mini-title">Credentials נדרשים</div>
+          <span class="cred">CLIENT_ID</span>
+          <span class="cred">ACCESS_TOKEN</span>
+          <span class="cred">REFRESH_TOKEN</span>
+          <span class="cred">Google Drive OAuth2</span>
+        </div>
+      </div>
+
+      <div class="card purple">
+        <h3>Render.com — Python Engine</h3>
+        <p>לב המערכת: מעבד רשומות, קובע אחריות לפי קוד שגיאה, יוצר טיוטות Gmail ישירות.</p>
+        <ul style="margin-top:0.8rem;">
+          <li>מקבל records + mapping מ-n8n</li>
+          <li>מריץ לוגיקת אסקלציה</li>
+          <li>יוצר טיוטה אחת per מעסיק</li>
+          <li>מדווח ל-n8n: update_payload + תוצאות יצירת דרפטים</li>
+        </ul>
+        <div style="margin-top:1rem;">
+          <div class="mini-title">Credentials נדרשים</div>
+          <span class="cred">GMAIL_SERVICE_ACCOUNT_B64</span>
+          <span style="font-size:0.8rem;color:var(--text-light);"> (env var ב-Render)</span>
+        </div>
+      </div>
+
+      <div class="card teal">
+        <h3>Google Drive — קובץ מיפוי</h3>
+        <p>קובץ <strong>error_code_mapping_final.xlsx</strong> — ממפה קוד שגיאה לאחריות (מעסיק / גוף מוסדי) ולהגדרת Override.</p>
+        <div style="margin-top:1rem;">
+          <div class="mini-title">Credentials נדרשים</div>
+          <span class="cred">Google Drive OAuth2</span>
+          <span class="tag shahar">לאשר עם עידו</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Gmail — תיבות מנהלות תיק</h3>
+        <p>הטיוטות נוצרות <strong>ישירות</strong> בתיבת המייל של מנהלת התיק הרלוונטית לכל מעסיק, באמצעות Service Account עם Domain-Wide Delegation.</p>
+        <div style="margin-top:1rem;">
+          <div class="mini-title">Credentials נדרשים</div>
+          <span class="cred">Service Account + DWD</span>
+          <span style="font-size:0.8rem;color:var(--text-light);"> (הוגדר)</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== 3. LOGIC ===== -->
+  <div class="section">
+    <div class="section-title">לוגיקת עיבוד</div>
+
+    <div class="card" style="margin-bottom:1.5rem;">
+      <h3>מדיניות אסקלציה לפי Counter</h3>
+      <p style="font-size:0.85rem;color:var(--text-light);margin-bottom:1rem;">ה-Counter מגיע מוכן מה-API של דוד ומשמש לקביעת רמת האסקלציה.</p>
+      <table>
+        <tr><th>Counter</th><th>פעולה</th><th>נמען</th></tr>
+        <tr><td><strong>0</strong></td><td>שגיאה חדשה — אין פעולה השבוע</td><td>—</td></tr>
+        <tr><td><strong>1</strong></td><td>מייל ראשון</td><td>מעסיק / גוף מוסדי</td></tr>
+        <tr><td><strong>2</strong></td><td>תזכורת + הפרדה שגיאות חדשות/חוזרות</td><td>מעסיק / גוף מוסדי</td></tr>
+        <tr><td><strong>3</strong></td><td>הסלמה פנימית — בקשת שיחה טלפונית</td><td>מנהלת תיק</td></tr>
+        <tr><td><strong>4</strong></td><td>הסלמה + מנהלת ראשית</td><td>מנהלת תיק + מנהלת ראשית</td></tr>
+        <tr><td><strong>5+</strong></td><td>הסלמה להנהלה בכירה</td><td>מנהלת תיק + מנהלת ראשית + הנהלה</td></tr>
+      </table>
+    </div>
+
+    <div class="card purple">
+      <h3>לוגיקת Override — העברת אחריות</h3>
+      <p>לקודי שגיאה <strong>4, 5, 15, 93</strong> — אם קיים <code>LastPositive_CHODESH_MASKORET</code> שהוא ישן מהחודש הנוכחי, האחריות עוברת מהמעסיק לגוף המוסדי.</p>
+      <div style="margin-top:0.8rem; font-size:0.88rem; color:var(--text-light);">
+        משמעות: הבעיה אצל חברת הביטוח/קרן הפנסיה, לא אצל המעסיק.
+      </div>
+    </div>
+
+    <div class="card teal" style="margin-top:1rem;">
+      <h3>אגרגציה לדרפטים</h3>
+      <ul>
+        <li>קיבוץ כל הרשומות per <strong>CustomerNumber</strong></li>
+        <li>דרפט אחד per מעסיק — עם שתי טבלאות: שגיאות חדשות + שגיאות חוזרות</li>
+        <li>הדרפט נוצר בתיבת <strong>CustomerAccountManagerEmail</strong> (מנהלת התיק)</li>
+        <li>נמען המייל (TO): <strong>CustomerContactEmail</strong> (איש קשר מטעם המעסיק)</li>
+        <li>מצורף: קובץ Excel עם פירוט מלא</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ===== 4. EMAIL MOCKUP ===== -->
+  <div class="section">
+    <div class="section-title">דוגמת מייל — טיוטה</div>
+    <div class="email-mock">
+      <div class="email-mock-header">
+        <div class="row"><span class="label">נושא:</span><span class="val">היזון חוזר פנסיוני — מעסיק 582341 | 4 רשומות לטיפול</span></div>
+        <div class="row"><span class="label">אל:</span><span class="val">moshe.cohen@employer.co.il</span></div>
+        <div class="row"><span class="label">מ:</span><span class="val">case.manager@hasheket.co.il</span> <span style="font-size:0.78rem;color:var(--text-light);">(מנהלת התיק — טיוטה בתיבתה)</span></div>
+        <div class="row"><span class="label">מצורף:</span><span class="val">hizon_hazor_582341.xlsx</span></div>
+      </div>
+      <div class="email-mock-body" style="font-size:0.88rem;">
+        <p>שלום משה כהן,</p>
+        <p style="margin-top:0.8rem;">מצורפות רשומות היזון חוזר הדורשות טיפולך עבור מעסיק 582341.</p>
+
+        <h3 style="margin-top:1.5rem;font-size:0.92rem;color:var(--green);">שגיאות חדשות (2 רשומות)</h3>
+        <table>
+          <tr><th>מ.ז. עובד</th><th>קוד קופה</th><th>קוד שגיאה</th><th>תיאור שגיאה</th></tr>
+          <tr><td>052XXXXXXX</td><td>514-6001</td><td>12</td><td>חוסר בפרטי עובד</td></tr>
+          <tr><td>034XXXXXXX</td><td>514-6001</td><td>7</td><td>שכר לא תואם</td></tr>
+        </table>
+
+        <h3 style="margin-top:1.5rem;font-size:0.92rem;color:#c0392b;">שגיאות חוזרות — דווחו בעבר (2 רשומות)</h3>
+        <table>
+          <tr><th>מ.ז. עובד</th><th>קוד קופה</th><th>קוד שגיאה</th><th>תיאור שגיאה</th></tr>
+          <tr><td>071XXXXXXX</td><td>514-6001</td><td>4</td><td>אי התאמה בנתוני שכר</td></tr>
+          <tr><td>088XXXXXXX</td><td>514-6001</td><td>15</td><td>פרטי חשבון חסרים</td></tr>
+        </table>
+
+        <p style="margin-top:1.5rem;">לפרטים מלאים ראה קובץ מצורף.</p>
+        <p style="margin-top:0.5rem;">בברכה,<br>צוות השקט שלך</p>
+      </div>
+    </div>
+    <div class="note">
+      הטיוטה יושבת בתיבת מנהלת התיק וממתינה לאישורה לפני שליחה. מנהלת התיק יכולה לערוך, לאשר ולשלוח.
+    </div>
+  </div>
+
+  <!-- ===== 5. DATA TO DAVID ===== -->
+  <div class="section">
+    <div class="section-title">מבנה הנתונים לדוד — SetFeedbackStatus</div>
+    <div class="card" style="margin-bottom:1rem;">
+      <h3>קריאה נפרדת per רשומה</h3>
+      <p style="margin-bottom:1rem; font-size:0.88rem;">POST ל-<code>SetFeedbackStatus</code> — רשומה אחת לכל קריאה, בתגובה 204 No Content.</p>
+      <div class="code-block">
+<span class="code-comment">// דוגמה — רשומה בודדת</span>
+{
+  <span class="code-key">"MISPAR_MEZAHE_RESHUMA"</span>: <span class="code-str">"REC-2026-058234"</span>,
+  <span class="code-key">"TreatmentStatus"</span>:       <span class="code-str">"נשלח מייל למעסיק שבוע 1"</span>,
+  <span class="code-key">"Counter"</span>:               <span class="code-num">1</span>
+}
+      </div>
+    </div>
+
+    <div class="card teal">
+      <h3>ערכי TreatmentStatus האפשריים</h3>
+      <table style="margin-top:0.5rem;">
+        <tr><th>Counter</th><th>TreatmentStatus</th></tr>
+        <tr><td>0</td><td>שגיאה חדשה - המתנה לשבוע הבא</td></tr>
+        <tr><td>1</td><td>נשלח מייל למעסיק שבוע 1</td></tr>
+        <tr><td>2</td><td>נשלח מייל תזכורת למעסיק שבוע 2</td></tr>
+        <tr><td>3</td><td>הסלמה למנהלת תיק (שבוע 3)</td></tr>
+        <tr><td>4</td><td>הסלמה למנהלת תיק + מנהלת ראשית (שבוע 4)</td></tr>
+        <tr><td>5+</td><td>הסלמה להנהלה בכירה (שבוע N)</td></tr>
+      </table>
+      <p style="margin-top:0.8rem;font-size:0.82rem;color:var(--text-light);">* עבור גוף מוסדי: "גוף מוסדי" במקום "מעסיק"</p>
+    </div>
+
+    <div class="note" style="margin-top:1rem;">
+      <strong>אזהרת עומסים מדוד:</strong> לשלוח ב-chunks (עשרות-מאות רשומות) עם הפסקה בין batch לבatch. מומלץ בזמנים פנויים (לילה / סוף שבוע). לתאם עם דוד לפני ייצור.
+    </div>
+  </div>
+
+  <!-- ===== 6. OPEN ISSUES ===== -->
+  <div class="section">
+    <div class="section-title">נקודות פתוחות לקראת שלב הטסטים</div>
+
+    <div class="card red">
+      <h3>1. Google Drive — איזה חשבון? <span class="tag shahar">עידו</span></h3>
+      <p>קובץ המיפוי (<strong>error_code_mapping_final.xlsx</strong>) צריך לשבת ב-Drive שאליו n8n יכול לגשת. צריך לאשר עם עידו איזה Google Workspace account מחובר ל-n8n ולוודא שהקובץ נמצא שם.</p>
+    </div>
+
+    <div class="card red">
+      <h3>2. מיילים לטסט — כתובת אחת <span class="tag flow">אחריות ניר</span></h3>
+      <p>לצורך הטסט, כל הטיוטות יגיעו לתיבת מייל אחת (ולא לכל מנהלת תיק לפי רשומה). זה מוגדר אצלנו בלבד — env var ב-Render בשם <strong>TEST_EMAIL_OVERRIDE</strong>. לפני מעבר לייצור: מוחקים את ה-env var, וכל טיוטה הולכת לתיבה הנכונה אוטומטית. דוד לא צריך לשנות שום דבר.</p>
+    </div>
+
+    <div class="card red">
+      <h3>3. שמירת Refresh Token אחרי רענון <span class="tag flow">אחריות ניר</span></h3>
+      <p>כרגע n8n שומר רק את ה-<strong>access_token</strong> החדש אחרי רענון, ה-<strong>refresh_token</strong> החדש נזרק. כשה-refresh_token הנוכחי יפוג (2027-03-01) — המערכת תפסיק לעבוד. צריך פתרון לשמירת ה-refresh_token המתחלף (n8n Variables / Supabase / דוד ייפיק זוג חדש ידנית).</p>
+    </div>
+
+    <div class="card red">
+      <h3>4. הפעלת SetFeedbackStatus בפועל <span class="tag david">דוד</span></h3>
+      <p>לצורך בדיקת end-to-end — לאשר עם דוד שה-endpoint כותב לבסיס הנתונים בסביבת הטסט (לפי המייל האחרון, הוא כן מומש, אך כדאי לאמת).</p>
+    </div>
+
+    <div class="card" style="border-right-color: #f59e0b;">
+      <h3>5. Chunking ב-SetFeedbackStatus <span class="tag flow">אחריות ניר</span></h3>
+      <p>דוד ביקש לא לשלוח 1,000 קריאות ברצף רציף. יש להוסיף delay בין batches ב-n8n (node-13). לתאם איתו את הגדלים והזמנים לפני ייצור.</p>
+    </div>
+
+    <div class="card" style="border-right-color: #f59e0b;">
+      <h3>6. Trigger שבועי — Cron <span class="tag flow">אחריות ניר</span></h3>
+      <p>כרגע ה-workflow מופעל ידנית. לפני ייצור: להחליף את node-01 (Manual Trigger) ל-Schedule Trigger בn8n. לקבוע יום ושעה (מומלץ: ראשון בלילה).</p>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <hr>
+  <div style="text-align:center; font-size:0.8rem; color:var(--text-light); padding-bottom:2rem;">
+    Spring AI × hspension | מרץ 2026 | לשימוש פנימי בלבד
+  </div>
+
+</div>
+</body>
+</html>

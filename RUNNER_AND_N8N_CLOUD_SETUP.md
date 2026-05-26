@@ -49,9 +49,7 @@ ngrok http 8787
 
 ואז עדכן:
 1. ב־node `HTTP Request (Run Pilot + Get XLSX)`:
-   - **שימו לב**: בגרסה המעודכנת יש 2 HTTP Requests:
-     - `HTTP Request (Run Pilot)` → URL: `<ngrok-url>/run-pilot` (POST, JSON)
-     - `HTTP Request (Download XLSX)` → URL: `<ngrok-url>/latest/file` (GET, File)
+   - את ה־URL ל־URL הציבורי שלך (ngrok) + `/run-pilot/file`
 2. ב־node `Gmail (Create Draft)`:
    - לבחור את ה־Credentials של Gmail שלך
 3. יעד ה־To:

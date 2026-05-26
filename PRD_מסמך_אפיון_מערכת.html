@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מסמך דרישות מוצר - אוטומציה לטיפול בהיזון חוזר פנסיוני</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 21cm;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .page {
+            background: white;
+            padding: 40px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #1a5490;
+            border-bottom: 4px solid #1a5490;
+            padding-bottom: 10px;
+            margin-top: 0;
+            font-size: 28px;
+        }
+
+        h2 {
+            color: #2c5aa0;
+            margin-top: 30px;
+            font-size: 22px;
+            border-right: 5px solid #2c5aa0;
+            padding-right: 15px;
+        }
+
+        h3 {
+            color: #3d6db5;
+            font-size: 18px;
+            margin-top: 20px;
+        }
+
+        h4 {
+            color: #4d7dc5;
+            font-size: 16px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+        }
+
+        th {
+            background: #1a5490;
+            color: white;
+            padding: 12px;
+            text-align: right;
+            font-weight: bold;
+        }
+
+        td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: right;
+        }
+
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-right: 5px solid #2196f3;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .warning-box {
+            background: #fff3e0;
+            border-right: 5px solid #ff9800;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .success-box {
+            background: #e8f5e9;
+            border-right: 5px solid #4caf50;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .diagram {
+            background: #fafafa;
+            border: 2px solid #ddd;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            direction: ltr;
+            text-align: center;
+            border-radius: 4px;
+        }
+
+        ul, ol {
+            margin: 10px 0;
+            padding-right: 20px;
+        }
+
+        li {
+            margin: 5px 0;
+        }
+
+        .metric-card {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            margin: 10px 10px 10px 0;
+            border-radius: 8px;
+            min-width: 200px;
+        }
+
+        .metric-value {
+            font-size: 32px;
+            font-weight: bold;
+            display: block;
+        }
+
+        .metric-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .timeline {
+            border-right: 3px solid #1a5490;
+            padding-right: 20px;
+            margin: 20px 0;
+        }
+
+        .timeline-item {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .timeline-item::before {
+            content: "●";
+            position: absolute;
+            right: -28px;
+            color: #1a5490;
+            font-size: 20px;
+        }
+
+        .cover-page {
+            text-align: center;
+            padding: 100px 40px;
+        }
+
+        .cover-title {
+            font-size: 42px;
+            color: #1a5490;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .cover-subtitle {
+            font-size: 24px;
+            color: #666;
+            margin-bottom: 40px;
+        }
+
+        .cover-info {
+            font-size: 16px;
+            color: #888;
+            margin: 10px 0;
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+            .page {
+                box-shadow: none;
+                page-break-after: always;
+                margin: 0;
+                padding: 20px;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+
+        .checkmark {
+            color: #4caf50;
+            font-weight: bold;
+        }
+
+        .xmark {
+            color: #f44336;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<!-- דף שער -->
+<div class="page cover-page">
+    <div class="cover-title">מסמך דרישות מוצר (PRD)</div>
+    <div class="cover-subtitle">מערכת אוטומציה לטיפול בהיזון חוזר פנסיוני</div>
+    <div style="margin: 60px 0;">
+        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 24 24'%3E%3Cpath fill='%231a5490' d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z'/%3E%3C/svg%3E" alt="icon">
+    </div>
+    <div class="cover-info"><strong>לקוח:</strong> חברת "השקט שלך"</div>
+    <div class="cover-info"><strong>ספק:</strong> Avivi Solutions</div>
+    <div class="cover-info"><strong>גרסה:</strong> 1.0</div>
+    <div class="cover-info"><strong>תאריך:</strong> 15 בדצמבר 2025</div>
+    <div class="cover-info"><strong>סיווג:</strong> פנימי - הנהלה וצוותים טכניים</div>
+</div>
+
+<!-- תוכן עניינים -->
+<div class="page">
+    <h1>תוכן עניינים</h1>
+    <ol style="font-size: 16px; line-height: 2;">
+        <li><a href="#executive">תקציר מנהלים</a></li>
+        <li><a href="#problem">הבעיה העסקית וההזדמנות</a></li>
+        <li><a href="#solution">סקירת הפתרון</a></li>
+        <li><a href="#features">יכולות ותכונות המערכת</a></li>
+        <li><a href="#workflow">מסע המשתמש וזרימת העבודה</a></li>
+        <li><a href="#architecture">ארכיטקטורה טכנית</a></li>
+        <li><a href="#roadmap">מפת דרכים ליישום</a></li>
+        <li><a href="#metrics">מדדי הצלחה</a></li>
+        <li><a href="#risks">סיכונים והפחתתם</a></li>
+        <li><a href="#glossary">נספח: מילון מונחים</a></li>
+    </ol>
+</div>
+
+<!-- 1. תקציר מנהלים -->
+<div class="page" id="executive">
+    <h1>1. תקציר מנהלים</h1>
+
+    <h2>1.1 מהו הפרויקט?</h2>
+    <p>פרויקט זה מבצע אוטומציה לתהליך הטיפול בשגיאות היזון חוזר פנסיוני המבוצע כיום באופן ידני על ידי מנהלות תיקים. המערכת תבצע:</p>
+    <ul>
+        <li><strong>קריאה</strong> - דוחות שגיאות מהמסלקה הפנסיונית</li>
+        <li><strong>זיהוי</strong> - אילו שגיאות דורשות טיפול</li>
+        <li><strong>הכנה</strong> - טיוטות מייל אוטומטיות</li>
+        <li><strong>שחרור זמן</strong> - מנהלות תיקים יטפלו רק במקרים מורכבים</li>
+    </ul>
+
+    <h2>1.2 מדוע אנחנו צריכים את זה?</h2>
+
+    <div style="display: flex; gap: 20px; margin: 20px 0;">
+        <div style="flex: 1;">
+            <h3 style="color: #f44336;">❌ מצב נוכחי</h3>
+            <ul>
+                <li>מנהלות תיקים משקיעות <strong>שעות רבות בשבוע</strong> בסקירה ידנית של קבצי שגיאות</li>
+                <li>שגיאות חוזרות ועוקבות דפוסים צפויים</li>
+                <li>סיכון לטעות אנוש בזיהוי הגורם האחראי</li>
+                <li>תגובה מאוחרת לנושאים דחופים</li>
+            </ul>
+        </div>
+
+        <div style="flex: 1;">
+            <h3 style="color: #4caf50;">✅ מצב עתידי (עם אוטומציה)</h3>
+            <ul>
+                <li><strong>צמצום 90%</strong> בעבודה ידנית</li>
+                <li>טיוטות מייל מוכנות <strong>באותו היום</strong></li>
+                <li><strong>אפס שגיאות</strong> בזיהוי גורמים אחראיים</li>
+                <li>מנהלות תיקים ממוקדות ב<strong>משימות בעלות ערך גבוה בלבד</strong></li>
+            </ul>
+        </div>
+    </div>
+
+    <h2>1.3 סיכום השקעה</h2>
+    <table>
+        <tr>
+            <th style="width: 30%;">פרמטר</th>
+            <th>פירוט</th>
+        </tr>
+        <tr>
+            <td><strong>לוח זמנים</strong></td>
+            <td>8-12 שבועות (פיילוט → ייצור)</td>
+        </tr>
+        <tr>
+            <td><strong>החזר השקעה (ROI)</strong></td>
+            <td>חיסכון של 15-20 שעות שבועיות לכל מנהלת תיק</td>
+        </tr>
+        <tr>
+            <td><strong>טכנולוגיה</strong></td>
+            <td>אוטומציה n8n + עיבוד Python + אינטגרציה Gmail</td>
+        </tr>
+        <tr>
+            <td><strong>רמת סיכון</strong></td>
+            <td>נמוכה (השקה מדורגת, נדרש אישור אנושי)</td>
+        </tr>
+    </table>
+
+    <div class="success-box">
+        <h3 style="margin-top: 0;">💡 ערך מיידי</h3>
+        <p><strong>שבוע ראשון:</strong> מנהלת תיק תקבל 20 טיוטות מייל מוכנות במקום לכתוב אותן ידנית - חיסכון של 4 שעות.</p>
+        <p><strong>חודש ראשון:</strong> חיסכון של כ-16 שעות עבודה = יום עבודה שלם בחודש לכל מנהלת תיק.</p>
+    </div>
+</div>
+
+<!-- 2. הבעיה העסקית -->
+<div class="page" id="problem">
+    <h1>2. הבעיה העסקית וההזדמנות</h1>
+
+    <h2>2.1 התהליך הנוכחי (ידני)</h2>
+
+    <div class="info-box">
+        <h3 style="margin-top: 0;">📅 כל שבוע:</h3>
+        <ol>
+            <li>מנהלת תיק מקבלת קובץ Excel מהמסלקה הפנסיונית (מאות/אלפי שורות)</li>
+            <li>סוקרת ידנית כל שגיאה</li>
+            <li>מזהה מי האחראי (מעסיק מול קופת גמל)</li>
+            <li>כותבת מיילים נפרדים לכל גורם</li>
+            <li>עוקבת אחר המשך טיפול באופן ידני</li>
+        </ol>
+    </div>
+
+    <table>
+        <tr>
+            <th>מדד</th>
+            <th>ערך נוכחי</th>
+        </tr>
+        <tr>
+            <td>השקעת זמן</td>
+            <td>15-20 שעות/שבוע</td>
+        </tr>
+        <tr>
+            <td>שיעור טעויות</td>
+            <td>5-10% (גורם אחראי שגוי, שגיאות שהוחמצו)</td>
+        </tr>
+        <tr>
+            <td>זמן תגובה</td>
+            <td>2-5 יום</td>
+        </tr>
+    </table>
+
+    <h2>2.2 השפעה עסקית של התהליך הנוכחי</h2>
+
+    <h3>עלויות:</h3>
+    <ul>
+        <li>עלות עבודה גבוהה לעבודה חוזרת</li>
+        <li>פתרון שגיאות מושהה = תשלומים מושהים</li>
+        <li>השפעה על שביעות רצון לקוחות</li>
+        <li>סיכון רגולטורי</li>
+    </ul>
+
+    <h3>הזדמנויות שהוחמצו:</h3>
+    <ul>
+        <li>מנהלות תיקים יכולות להתמקד ביחסי לקוחות</li>
+        <li>זיהוי פרואקטיבי של בעיות</li>
+        <li>ניתוח מגמות ומניעה</li>
+    </ul>
+
+    <h2>2.3 ההזדמנות</h2>
+
+    <div class="metric-card">
+        <span class="metric-value">85-90%</span>
+        <span class="metric-label">מהשגיאות עוקבות דפוסים סטנדרטיים</span>
+    </div>
+
+    <div class="metric-card">
+        <span class="metric-value">16 שעות</span>
+        <span class="metric-label">חיסכון חודשי למנהלת תיק</span>
+    </div>
+
+    <div class="metric-card">
+        <span class="metric-value">100%</span>
+        <span class="metric-label">דיוק בזיהוי אחריות</span>
+    </div>
+</div>
+
+<!-- 3. סקירת הפתרון -->
+<div class="page" id="solution">
+    <h1>3. סקירת הפתרון</h1>
+
+    <h2>3.1 מה המערכת תעשה?</h2>
+
+    <div class="diagram">
+        <pre style="text-align: right; direction: rtl; font-size: 14px;">
+┌─────────────────────────────────────────────────────────────────┐
+│                    זרימת עבודה אוטומטית                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. קליטה → קריאת קובץ שגיאות מהמסלקה                          │
+│             (אוטומטי, כל יום שלישי בבוקר)                       │
+│                                                                  │
+│  2. ניתוח → זיהוי שגיאות, חישוב משך זמן, הקצאת אחריות          │
+│            (מעסיק מול קופת גמל)                                 │
+│                                                                  │
+│  3. סיווג → קיבוץ שגיאות לפי סוג וחומרה                        │
+│                                                                  │
+│  4. יצירת טיוטות → יצירת טיוטות מייל ב-Gmail אוטומטית          │
+│                    (לא נשלחות - ממתינות לאישור אנושי)            │
+│                                                                  │
+│  5. התראה → התראה למנהלת תיק שהטיוטות מוכנות                   │
+│                                                                  │
+│  6. סקירה → מנהלת תיק סוקרת, עורכת במידת הצורך, ושולחת         │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+        </pre>
+    </div>
+
+    <h2>3.2 עקרונות מפתח</h2>
+
+    <table>
+        <tr>
+            <th style="width: 30%;">עיקרון</th>
+            <th>הסבר</th>
+        </tr>
+        <tr>
+            <td><span class="checkmark">✓</span> אדם בלולאה</td>
+            <td>כל המיילים דורשים אישור אנושי לפני שליחה</td>
+        </tr>
+        <tr>
+            <td><span class="checkmark">✓</span> פרטיות קודם כל</td>
+            <td>נתונים רגישים נשארים בתוך מערכות מאובטחות</td>
+        </tr>
+        <tr>
+            <td><span class="checkmark">✓</span> השקה מדורגת</td>
+            <td>התחלה עם שבוע אחרון בלבד, אחר כך הרחבה</td>
+        </tr>
+        <tr>
+            <td><span class="checkmark">✓</span> שקיפות</td>
+            <td>לוג מלא ומסלול ביקורת של כל הפעולות</td>
+        </tr>
+        <tr>
+            <td><span class="checkmark">✓</span> גמישות</td>
+            <td>קל לעדכן חוקים ותבניות</td>
+        </tr>
+    </table>
+</div>
+
+<!-- 4. יכולות ותכונות -->
+<div class="page" id="features">
+    <h1>4. יכולות ותכונות המערכת</h1>
+
+    <h2>4.1 תכונות ליבה</h2>
+
+    <h3>תכונה 1: קליטת נתונים חכמה</h3>
+    <div class="info-box">
+        <p><strong>מה היא עושה:</strong></p>
+        <ul>
+            <li>קוראת קבצי Excel/XML מהמסלקה</li>
+            <li>מסננת להציג רק שגיאות רלוונטיות (4 סוגי סטטוס מוגדרים)</li>
+            <li><strong>פיילוט ראשוני:</strong> שבוע אחרון בלבד</li>
+            <li><strong>ייצור:</strong> כל הנתונים מאז תאריך העלייה לייצור</li>
+        </ul>
+        <p><strong>ערך עסקי:</strong></p>
+        <ul>
+            <li>אפס הכנת קבצים ידנית</li>
+            <li>איכות נתונים עקבית</li>
+            <li>אין רשומות שמוחמצות</li>
+        </ul>
+    </div>
+
+    <h3>תכונה 2: סיווג שגיאות חכם</h3>
+    <div class="info-box">
+        <p><strong>מה היא עושה:</strong></p>
+        <ul>
+            <li>מתאימה קודי שגיאה לחוקים מוגדרים מראש</li>
+            <li>מחשבת כמה זמן כל שגיאה פתוחה (מונה שבועי)</li>
+            <li>קובעת גורם אחראי:
+                <ul>
+                    <li>מעסיק (הנפוץ ביותר)</li>
+                    <li>קופת גמל (במקרים מיוחדים)</li>
+                    <li>דורש סקירה ידנית (מקרים מורכבים)</li>
+                </ul>
+            </li>
+        </ul>
+        <p><strong>ערך עסקי:</strong></p>
+        <ul>
+            <li>דיוק 100% בהקצאה</li>
+            <li>הסלמה אוטומטית לשגיאות ותיקות</li>
+            <li>אחריות ברורה</li>
+        </ul>
+    </div>
+
+    <h3>תכונה 3: מעקב משך זמן והסלמה</h3>
+    <div class="warning-box">
+        <p><strong>לוגיקת הסלמה אוטומטית:</strong></p>
+        <table>
+            <tr>
+                <th>שבוע</th>
+                <th>פעולה</th>
+            </tr>
+            <tr>
+                <td><strong>שבוע 0</strong></td>
+                <td>שגיאה חדשה → אין פעולה (המתנה לשבוע הבא)</td>
+            </tr>
+            <tr>
+                <td><strong>שבוע 1</strong></td>
+                <td>שליחת מייל ראשון לגורם האחראי</td>
+            </tr>
+            <tr>
+                <td><strong>שבוע 2</strong></td>
+                <td>שליחת תזכורת עם הפרדה (חדשות מול חוזרות)</td>
+            </tr>
+            <tr>
+                <td><strong>שבוע 3</strong></td>
+                <td>מייל פנימי למנהלת תיק (נדרש מעקב טלפוני)</td>
+            </tr>
+            <tr>
+                <td><strong>שבוע 4</strong></td>
+                <td>מייל פנימי למנהלת תיק + מנהל</td>
+            </tr>
+            <tr>
+                <td><strong>שבוע 5+</strong></td>
+                <td>מייל פנימי למנהלת תיק + מנהל + מנכ"ל</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="success-box">
+        <p><strong>ערך עסקי:</strong></p>
+        <ul>
+            <li>אין שגיאות ש"נופלות בין הכיסאות"</li>
+            <li>הסלמה אוטומטית</li>
+            <li>נראות להנהלה על נושאים כרוניים</li>
+        </ul>
+    </div>
+
+    <h3>תכונה 4: יצירת טיוטות מייל אוטומטית</h3>
+    <div class="info-box">
+        <p><strong>מה היא עושה:</strong></p>
+        <ul>
+            <li>יוצרת טיוטות מייל ב-Gmail (לא נשלחות אוטומטית)</li>
+            <li><strong>מיילים חיצוניים (למעסיקים):</strong>
+                <ul>
+                    <li>מייל אחד לכל מעסיק (מאחד את כל השגיאות שלו)</li>
+                    <li>תבנית מקצועית עם פירוט שגיאות</li>
+                    <li>קובץ Excel מצורף עם רשימת שגיאות מלאה</li>
+                </ul>
+            </li>
+            <li><strong>מיילים פנימיים (לצוות):</strong>
+                <ul>
+                    <li>סיכום שגיאות הדורשות תשומת לב</li>
+                    <li>פריטי פעולה לפי עדיפות</li>
+                </ul>
+            </li>
+        </ul>
+        <p><strong>ערך עסקי:</strong></p>
+        <ul>
+            <li>חיסכון 90% בזמן כתיבת מיילים</li>
+            <li>תקשורת מקצועית עקבית</li>
+            <li>מנהלת תיק סוקרת ומאשרת לפני שליחה</li>
+        </ul>
+    </div>
+
+    <h3>תכונה 5: אנליטיקה ודיווח</h3>
+    <div class="info-box">
+        <p><strong>מה היא עושה:</strong></p>
+        <ul>
+            <li>מייצרת דוח סיכום שבועי:
+                <ul>
+                    <li>סך שגיאות לפי סוג</li>
+                    <li>פילוח לפי מעסיק/קופת גמל</li>
+                    <li>ניתוח גיל (כמה זמן שגיאות פתוחות)</li>
+                    <li>ניתוח מגמות (משתפר/מחמיר)</li>
+                </ul>
+            </li>
+            <li>שולח דוח לדשבורד הפורטל</li>
+        </ul>
+        <p><strong>ערך עסקי:</strong></p>
+        <ul>
+            <li>נראות להנהלה</li>
+            <li>זיהוי מעסיקים/קופות בעייתיים</li>
+            <li>החלטות מבוססות נתונים</li>
+        </ul>
+    </div>
+
+    <h2>4.2 לוגיקה מיוחדת: חוקי Override</h2>
+
+    <div class="warning-box">
+        <h3 style="margin-top: 0;">📋 עבור קודי שגיאה 4, 5, 15, 93:</h3>
+        <p>המערכת בודקת נתונים היסטוריים (חודשים קודמים)</p>
+        <p><strong>שאלה:</strong> האם זה עובד בהצלחה בעבר?</p>
+        <ul>
+            <li><span class="checkmark">✓</span> <strong>כן</strong> → אחריות = קופת גמל (לא מעסיק)</li>
+            <li><span class="xmark">✗</span> <strong>לא</strong> → אחריות = מעסיק</li>
+        </ul>
+        <p><strong>למה זה חשוב:</strong></p>
+        <ul>
+            <li>מונע האשמה שגויה של מעסיקים</li>
+            <li>פתרון מהיר יותר (פנייה לגורם הנכון מיד)</li>
+        </ul>
+    </div>
+</div>
+
+<!-- 5. מסע המשתמש -->
+<div class="page" id="workflow">
+    <h1>5. מסע המשתמש וזרימת העבודה</h1>
+
+    <h2>5.1 זרימה שבועית של מנהלת תיק</h2>
+
+    <div style="display: flex; gap: 20px;">
+        <div style="flex: 1; background: #ffebee; padding: 20px; border-radius: 8px;">
+            <h3 style="color: #c62828; margin-top: 0;">❌ לפני (תהליך ידני)</h3>
+            <div class="timeline">
+                <div class="timeline-item">
+                    <strong>יום שני:</strong>
+                    <ul>
+                        <li>הורדת קובץ (10 דקות)</li>
+                        <li>פתיחת Excel, סקירת 500 שורות (2 שעות)</li>
+                        <li>זיהוי שגיאות (שעה)</li>
+                        <li>חיפוש אנשי קשר מעסיקים (30 דקות)</li>
+                        <li>כתיבת 20 מיילים נפרדים (4 שעות)</li>
+                        <li>מעקב בגיליון אלקטרוני (30 דקות)</li>
+                    </ul>
+                    <p><strong>סה"כ: ~8-9 שעות</strong></p>
+                </div>
+            </div>
+        </div>
+
+        <div style="flex: 1; background: #e8f5e9; padding: 20px; border-radius: 8px;">
+            <h3 style="color: #2e7d32; margin-top: 0;">✅ אחרי (תהליך אוטומטי)</h3>
+            <div class="timeline">
+                <div class="timeline-item">
+                    <strong>יום שלישי בוקר:</strong>
+                    <ul>
+                        <li>קבלת התראה: "20 טיוטות מייל מוכנות לסקירה"</li>
+                        <li>פתיחת Gmail, סקירת טיוטות (30 דקות)</li>
+                        <li>עריכת 2-3 מקרים מורכבים (15 דקות)</li>
+                        <li>לחיצה על "שלח" בכל הטיוטות המאושרות (5 דקות)</li>
+                    </ul>
+                    <p><strong>סה"כ: ~50 דקות (חיסכון 90%!)</strong></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h2>5.2 תרשים זרימת מערכת</h2>
+
+    <div class="diagram">
+        <pre style="font-size: 12px; text-align: center;">
+┌──────────────────┐
+│     מסלקה        │ (קובץ שבועי זמין יום ג' בבוקר)
+│  קובץ Excel      │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│  מערכת אוטומציה  │
+│   (n8n + API)    │
+└────────┬─────────┘
+         │
+         ├─────────────────────────┬──────────────────┐
+         ▼                         ▼                  ▼
+┌────────────────┐      ┌──────────────────┐   ┌─────────────┐
+│  סינון נתונים  │      │  מיפוי שגיאות   │   │  מונה משך   │
+│  (שבוע אחרון/  │      │  (מי אחראי?)    │   │   זמן       │
+│   ייצור)       │      │                  │   │  (שבועות)   │
+└────────┬───────┘      └────────┬─────────┘   └──────┬──────┘
+         │                       │                     │
+         └───────────────────────┴─────────────────────┘
+                                 │
+                                 ▼
+                    ┌────────────────────────┐
+                    │  מנוע יצירת טיוטות    │
+                    │   (Gmail API)          │
+                    └────────────┬───────────┘
+                                 │
+                    ┌────────────┴────────────┐
+                    ▼                         ▼
+         ┌─────────────────────┐   ┌──────────────────┐
+         │  טיוטות חיצוניות   │   │  טיוטות פנימיות │
+         │  (למעסיקים/        │   │  (למנהלות תיקים) │
+         │   קופות גמל)       │   │                  │
+         └──────────┬──────────┘   └────────┬─────────┘
+                    │                       │
+                    └───────────┬───────────┘
+                                ▼
+                    ┌───────────────────────┐
+                    │   מנהלת תיק           │
+                    │   סוקרת ומאשרת       │
+                    │   (החלטה אנושית)      │
+                    └───────────────────────┘
+        </pre>
+    </div>
+</div>
+
+<!-- 6. ארכיטקטורה טכנית -->
+<div class="page" id="architecture">
+    <h1>6. ארכיטקטורה טכנית</h1>
+
+    <h2>6.1 רכיבי מערכת (הסבר לא-טכני)</h2>
+
+    <p>חשבו על המערכת כ<strong>קו ייצור במפעל:</strong></p>
+
+    <table>
+        <tr>
+            <th style="width: 25%;">תחנה</th>
+            <th style="width: 40%;">תפקיד</th>
+            <th>טכנולוגיה</th>
+        </tr>
+        <tr>
+            <td><strong>1. תחנת קלט</strong></td>
+            <td>מקבלת את הקובץ השבועי אוטומטית<br>בדיקת איכות: מוודאת פורמט נתונים</td>
+            <td>חיבור REST API לפורטל "השקט שלך"</td>
+        </tr>
+        <tr>
+            <td><strong>2. תחנת עיבוד</strong></td>
+            <td>קוראת כל שורת שגיאה<br>מיישמת חוקים עסקיים<br>מחשבת משך זמן<br>מקבצת שגיאות דומות</td>
+            <td>סקריפטי Python רצים ב-n8n</td>
+        </tr>
+        <tr>
+            <td><strong>3. תחנת החלטה</strong></td>
+            <td>מתאימה קוד שגיאה לפעולה<br>קובעת גורם אחראי<br>בוחרת תבנית מייל</td>
+            <td>טבלת מסד נתונים + לוגיקת Python</td>
+        </tr>
+        <tr>
+            <td><strong>4. תחנת פלט</strong></td>
+            <td>יוצרת טיוטות מייל<br>מצרפת קבצי Excel<br>רושמת כל פעולה</td>
+            <td>Gmail API (קריאה/כתיבה לטיוטות בלבד)</td>
+        </tr>
+        <tr>
+            <td><strong>5. תחנת דיווח</strong></td>
+            <td>מייצרת דוח סיכום<br>שולחת לדשבורד</td>
+            <td>API push לפורטל</td>
+        </tr>
+    </table>
+
+    <h2>6.2 מערך טכנולוגי (למנהלים טכניים)</h2>
+
+    <table>
+        <tr>
+            <th>רכיב</th>
+            <th>טכנולוגיה</th>
+            <th>מטרה</th>
+        </tr>
+        <tr>
+            <td><strong>תזמון</strong></td>
+            <td>n8n (Self-Hosted)</td>
+            <td>אוטומציה של זרימות עבודה, תזמון</td>
+        </tr>
+        <tr>
+            <td><strong>עיבוד</strong></td>
+            <td>Python 3.11+</td>
+            <td>ניתוח נתונים, לוגיקה עסקית</td>
+        </tr>
+        <tr>
+            <td><strong>אחסון נתונים</strong></td>
+            <td>PostgreSQL</td>
+            <td>חוקים, טבלאות מיפוי, לוגים</td>
+        </tr>
+        <tr>
+            <td><strong>מייל</strong></td>
+            <td>Gmail API</td>
+            <td>יצירת טיוטות (OAuth2, scope מוגבל)</td>
+        </tr>
+        <tr>
+            <td><strong>אינטגרציה</strong></td>
+            <td>REST APIs</td>
+            <td>חיבור לפורטל "השקט שלך"</td>
+        </tr>
+        <tr>
+            <td><strong>אבטחה</strong></td>
+            <td>Static IP + OAuth2</td>
+            <td>גישה מאובטחת, מסלול ביקורת</td>
+        </tr>
+        <tr>
+            <td><strong>ניטור</strong></td>
+            <td>לוגים מובנים של n8n</td>
+            <td>מעקב שגיאות, ביצועים</td>
+        </tr>
+    </table>
+
+    <h2>6.3 אבטחה ופרטיות</h2>
+
+    <div class="success-box">
+        <h3 style="margin-top: 0;">🔒 הגנת נתונים:</h3>
+        <ul>
+            <li><span class="checkmark">✓</span> כל המידע המזהה אישית (ת.ז., שמות) נשאר בתוך מערכות מאובטחות</li>
+            <li><span class="checkmark">✓</span> כתובת IP סטטית לכל חיבורי API</li>
+            <li><span class="checkmark">✓</span> אימות OAuth2 (אין סיסמאות שמורות)</li>
+            <li><span class="checkmark">✓</span> טיוטות מייל בלבד (Gmail scope מוגבל - לא יכול לשלוח אוטומטית)</li>
+            <li><span class="checkmark">✓</span> לוג ביקורת מלא של כל הפעולות</li>
+        </ul>
+    </div>
+
+    <div class="info-box">
+        <h3 style="margin-top: 0;">📋 תאימות רגולטורית:</h3>
+        <ul>
+            <li>תקנות פרטיות: כל הנתונים מטופלים בהתאם לחוק הגנת הפרטיות הישראלי</li>
+            <li>אין נתונים נשלחים לשירותי ענן חיצוניים (למעט Gmail/Google Workspace מאושרים)</li>
+        </ul>
+    </div>
+</div>
+
+<!-- 7. מפת דרכים -->
+<div class="page" id="roadmap">
+    <h1>7. מפת דרכים ליישום</h1>
+
+    <h2>שלב 1: פיילוט (שבועות 1-4)</h2>
+
+    <div class="info-box">
+        <p><strong>מטרה:</strong> אימות מערכת עם נתונים מינימליים (שבוע אחרון בלבד)</p>
+    </div>
+
+    <table>
+        <tr>
+            <th style="width: 15%;">שבוע</th>
+            <th style="width: 45%;">פעילויות</th>
+            <th>תוצרים</th>
+        </tr>
+        <tr>
+            <td><strong>1</strong></td>
+            <td>
+                - בדיקת אינטגרציית API<br>
+                - סיום טבלת מיפוי
+            </td>
+            <td>
+                - מחובר לפורטל<br>
+                - נתוני בדיקה שאובים
+            </td>
+        </tr>
+        <tr>
+            <td><strong>2</strong></td>
+            <td>
+                - פיתוח מנוע Python<br>
+                - לוגיקת סיווג שגיאות
+            </td>
+            <td>
+                - אב-טיפוס עובד<br>
+                - דוח דיוק
+            </td>
+        </tr>
+        <tr>
+            <td><strong>3</strong></td>
+            <td>
+                - אינטגרציית Gmail<br>
+                - יצירת תבניות מייל
+            </td>
+            <td>
+                - טיוטות מייל נוצרו<br>
+                - 5 ריצות בדיקה
+            </td>
+        </tr>
+        <tr>
+            <td><strong>4</strong></td>
+            <td>
+                - בדיקות קבלת משתמש<br>
+                - הדרכת מנהלות תיקים
+            </td>
+            <td>
+                - מסמך אישור<br>
+                - חומרי הדרכה
+            </td>
+        </tr>
+    </table>
+
+    <div class="success-box">
+        <h3 style="margin-top: 0;">✅ קריטריוני הצלחה:</h3>
+        <ul>
+            <li>דיוק 95%+ בסיווג שגיאות</li>
+            <li>כל טיוטות המייל מעוצבות נכון</li>
+            <li>מנהלת תיק מאשרת תוצאות פיילוט</li>
+        </ul>
+    </div>
+
+    <h2>שלב 2: עלייה לייצור (שבועות 5-8)</h2>
+
+    <div class="info-box">
+        <p><strong>מטרה:</strong> פריסה מלאה בייצור עם כל הנתונים מאז עלייה לאוויר</p>
+    </div>
+
+    <table>
+        <tr>
+            <th style="width: 15%;">שבוע</th>
+            <th style="width: 45%;">פעילויות</th>
+            <th>תוצרים</th>
+        </tr>
+        <tr>
+            <td><strong>5</strong></td>
+            <td>
+                - הגדרת תאריך התחלת ייצור (checkpoint)<br>
+                - עדכון מערכת להשתמש ב-checkpoint
+            </td>
+            <td>
+                - תצורת ייצור<br>
+                - העברת נתונים הושלמה
+            </td>
+        </tr>
+        <tr>
+            <td><strong>6</strong></td>
+            <td>
+                - ריצת ייצור ראשונה<br>
+                - ניטור צמוד
+            </td>
+            <td>
+                - טיוטות שבועיות בייצור<br>
+                - דוח אירועים
+            </td>
+        </tr>
+        <tr>
+            <td><strong>7-8</strong></td>
+            <td>
+                - אופטימיזציה<br>
+                - שיפורי תבניות
+            </td>
+            <td>
+                - כיוונון ביצועים<br>
+                - שילוב משוב משתמשים
+            </td>
+        </tr>
+    </table>
+
+    <h2>שלב 3: שיפורים (שבועות 9-12)</h2>
+
+    <div class="info-box">
+        <p><strong>מטרה:</strong> הוספת אנליטיקה ותכונות מתקדמות</p>
+    </div>
+
+    <ul>
+        <li>אינטגרציית דשבורד (דוחות אנליטיים)</li>
+        <li>ניתוח מגמות היסטוריות</li>
+        <li>זיהוי צפוי של שגיאות (שיפור עתידי)</li>
+        <li>הרחבת ספריית תבניות</li>
+    </ul>
+</div>
+
+<!-- 8. מדדי הצלחה -->
+<div class="page" id="metrics">
+    <h1>8. מדדי הצלחה</h1>
+
+    <h2>8.1 מדדים תפעוליים</h2>
+
+    <table>
+        <tr>
+            <th style="width: 30%;">מדד</th>
+            <th style="width: 20%;">יעד</th>
+            <th>איך נמדוד</th>
+        </tr>
+        <tr>
+            <td><strong>חיסכון בזמן</strong></td>
+            <td>צמצום 85-90%</td>
+            <td>שעות שהושקעו ביצירת טיוטות מייל</td>
+        </tr>
+        <tr>
+            <td><strong>שיעור שגיאות</strong></td>
+            <td>&lt;2% סיווג שגוי</td>
+            <td>ביקורת ידנית על מדגם (50 מקרים/שבוע)</td>
+        </tr>
+        <tr>
+            <td><strong>זמן תגובה</strong></td>
+            <td>טיוטות מוכנות באותו יום</td>
+            <td>זמן מקובץ זמין → טיוטות מוכנות</td>
+        </tr>
+        <tr>
+            <td><strong>שיעור אישור</strong></td>
+            <td>&gt;95% טיוטות נשלחות כמות שהן</td>
+            <td>% טיוטות שנשלחו ללא עריכה</td>
+        </tr>
+    </table>
+
+    <h2>8.2 מדדים עסקיים</h2>
+
+    <table>
+        <tr>
+            <th style="width: 30%;">מדד</th>
+            <th style="width: 20%;">יעד</th>
+            <th>השפעה</th>
+        </tr>
+        <tr>
+            <td><strong>זמן פתרון שגיאות</strong></td>
+            <td>צמצום 30%</td>
+            <td>פתרון מהיר יותר לנושאי לקוחות</td>
+        </tr>
+        <tr>
+            <td><strong>שגיאות כרוניות (5+ שבועות)</strong></td>
+            <td>צמצום 50%</td>
+            <td>תהליך הסלמה טוב יותר</td>
+        </tr>
+        <tr>
+            <td><strong>שביעות רצון מנהלות תיקים</strong></td>
+            <td>דירוג 8/10+</td>
+            <td>יותר זמן לעבודה בעלת ערך גבוה</td>
+        </tr>
+        <tr>
+            <td><strong>חיסכון בעלויות</strong></td>
+            <td>15-20 שעות/שבוע/מנהלת תיק</td>
+            <td>חישוב החזר השקעה</td>
+        </tr>
+    </table>
+
+    <h2>8.3 מדדים טכניים</h2>
+
+    <div class="metric-card">
+        <span class="metric-value">99%+</span>
+        <span class="metric-label">זמן פעילות מערכת (רץ בימי שלישי בבוקר)</span>
+    </div>
+
+    <div class="metric-card">
+        <span class="metric-value">&lt;10 דקות</span>
+        <span class="metric-label">זמן עיבוד ל-1,000 רשומות</span>
+    </div>
+
+    <div class="metric-card">
+        <span class="metric-value">&lt;1%</span>
+        <span class="metric-label">בקשות API כושלות</span>
+    </div>
+</div>
+
+<!-- 9. סיכונים -->
+<div class="page" id="risks">
+    <h1>9. סיכונים והפחתתם</h1>
+
+    <h2>9.1 סיכונים בעדיפות גבוהה</h2>
+
+    <table>
+        <tr>
+            <th style="width: 25%;">סיכון</th>
+            <th style="width: 15%;">השפעה</th>
+            <th style="width: 15%;">הסתברות</th>
+            <th>הפחתה</th>
+        </tr>
+        <tr>
+            <td><strong>הקצאת גורם אחראי שגוי</strong></td>
+            <td>גבוהה</td>
+            <td>נמוכה</td>
+            <td>
+                - בדיקות נרחבות בפיילוט<br>
+                - לוגיקת override לקודים מיוחדים<br>
+                - אישור אנושי לפני שליחה
+            </td>
+        </tr>
+        <tr>
+            <td><strong>מגבלות קצב Gmail API</strong></td>
+            <td>בינונית</td>
+            <td>נמוכה</td>
+            <td>
+                - עיבוד אצווה<br>
+                - לוגיקת ניסיון חוזר מובנית<br>
+                - התראות ניטור
+            </td>
+        </tr>
+        <tr>
+            <td><strong>פריצת פרטיות נתונים</strong></td>
+            <td>גבוהה</td>
+            <td>נמוכה מאוד</td>
+            <td>
+                - IP סטטי בלבד<br>
+                - scopes מוגבלים ב-OAuth<br>
+                - אין שיתוף נתונים חיצוני<br>
+                - לוגי ביקורת
+            </td>
+        </tr>
+        <tr>
+            <td><strong>השבתת מערכת ביום ג' בבוקר</strong></td>
+            <td>בינונית</td>
+            <td>נמוכה</td>
+            <td>
+                - תהליך גיבוי ידני<br>
+                - ניטור התראות<br>
+                - SLA להתאוששות באותו יום
+            </td>
+        </tr>
+    </table>
+
+    <h2>9.2 סיכונים בעדיפות בינונית</h2>
+
+    <table>
+        <tr>
+            <th style="width: 40%;">סיכון</th>
+            <th>הפחתה</th>
+        </tr>
+        <tr>
+            <td><strong>תבניות זקוקות לעדכונים תכופים</strong></td>
+            <td>
+                - ספריית תבניות במסד נתונים (עדכונים קלים)<br>
+                - בקרת גרסאות
+            </td>
+        </tr>
+        <tr>
+            <td><strong>שינויי API מ"השקט שלך"</strong></td>
+            <td>
+                - תיעוד API<br>
+                - תהליך הודעה על שינויים<br>
+                - בדיקות תאימות לאחור
+            </td>
+        </tr>
+        <tr>
+            <td><strong>התנגדות לאוטומציה</strong></td>
+            <td>
+                - הדרכת מנהלות תיקים<br>
+                - עלייה מדורגת<br>
+                - הדגמת חיסכון בזמן
+            </td>
+        </tr>
+    </table>
+</div>
+
+<!-- 10. מילון מונחים -->
+<div class="page" id="glossary">
+    <h1>10. נספח: מילון מונחים</h1>
+
+    <h2>למנהלים לא-טכניים</h2>
+
+    <table>
+        <tr>
+            <th style="width: 25%;">מונח</th>
+            <th>הסבר בעברית פשוטה</th>
+        </tr>
+        <tr>
+            <td><strong>API</strong></td>
+            <td>דרך לשני מערכות מחשב לדבר זו עם זו אוטומטית (כמו קו טלפון בין מערכות)</td>
+        </tr>
+        <tr>
+            <td><strong>טיוטת מייל (Draft)</strong></td>
+            <td>מייל שהוכן על ידי המערכת אבל לא נשלח - ממתין ב-Gmail לאדם לסקור ולאשר</td>
+        </tr>
+        <tr>
+            <td><strong>n8n</strong></td>
+            <td>תוכנת אוטומציה שמחברת מערכות שונות ומריצה משימות בלוח זמנים (כמו עוזר רובוטי)</td>
+        </tr>
+        <tr>
+            <td><strong>OAuth2</strong></td>
+            <td>שיטת כניסה מאובטחת (כמו שימוש ב"התחבר עם Google" - אין סיסמאות שמורות)</td>
+        </tr>
+        <tr>
+            <td><strong>IP סטטי</strong></td>
+            <td>כתובת אינטרנט קבועה לחיבורים מאובטחים (כמו מספר טלפון קבוע)</td>
+        </tr>
+        <tr>
+            <td><strong>מסלקה</strong></td>
+            <td>ארגון מרכזי שמעבד עסקאות פנסיוניות</td>
+        </tr>
+    </table>
+
+    <h2>מונחים עסקיים</h2>
+
+    <table>
+        <tr>
+            <th style="width: 25%;">מונח (עברית)</th>
+            <th style="width: 25%;">אנגלית</th>
+            <th>הגדרה</th>
+        </tr>
+        <tr>
+            <td><strong>היזון חוזר (Feedback)</strong></td>
+            <td>Feedback Report</td>
+            <td>דוח שגיאות מהמסלקה המציג עסקאות כושלות</td>
+        </tr>
+        <tr>
+            <td><strong>מסלקה</strong></td>
+            <td>Clearinghouse</td>
+            <td>מרכז עיבוד עסקאות פנסיוניות</td>
+        </tr>
+        <tr>
+            <td><strong>מנהלת תיק</strong></td>
+            <td>Portfolio Manager</td>
+            <td>עובדת שמנהלת יחסי לקוחות פנסיוניים</td>
+        </tr>
+        <tr>
+            <td><strong>גוף מוסדי</strong></td>
+            <td>Institutional Body</td>
+            <td>קופת גמל/חברת ביטוח</td>
+        </tr>
+        <tr>
+            <td><strong>קוד שגיאה</strong></td>
+            <td>Error Code</td>
+            <td>קוד מספרי המזהה סוג שגיאה ספציפי</td>
+        </tr>
+        <tr>
+            <td><strong>מונה שבועות (Counter)</strong></td>
+            <td>Weekly Counter</td>
+            <td>כמה שבועות שגיאה פתוחה באותו סטטוס</td>
+        </tr>
+    </table>
+
+    <h2>קודי שגיאה מיוחדים</h2>
+
+    <div class="warning-box">
+        <h3 style="margin-top: 0;">⚠️ קודים 4, 5, 15, 93</h3>
+        <p>קודים אלה דורשים בדיקה היסטורית מיוחדת כדי לקבוע האם האחריות היא של המעסיק או של הגוף המוסדי.</p>
+        <p><strong>תהליך:</strong> המערכת בודקת אם עבר בהצלחה בעבר → אם כן, האחריות עוברת לגוף המוסדי.</p>
+    </div>
+</div>
+
+<!-- דף אישורים -->
+<div class="page">
+    <h1>אישורי מסמך</h1>
+
+    <table>
+        <tr>
+            <th style="width: 25%;">תפקיד</th>
+            <th style="width: 25%;">שם</th>
+            <th style="width: 25%;">חתימה</th>
+            <th style="width: 25%;">תאריך</th>
+        </tr>
+        <tr>
+            <td><strong>בעלים עסקי</strong></td>
+            <td>&nbsp;</td>
+            <td>_____________</td>
+            <td>______</td>
+        </tr>
+        <tr>
+            <td><strong>מוביל טכני</strong></td>
+            <td>&nbsp;</td>
+            <td>_____________</td>
+            <td>______</td>
+        </tr>
+        <tr>
+            <td><strong>קצין תאימות</strong></td>
+            <td>&nbsp;</td>
+            <td>_____________</td>
+            <td>______</td>
+        </tr>
+        <tr>
+            <td><strong>מנהל פרויקט</strong></td>
+            <td>&nbsp;</td>
+            <td>_____________</td>
+            <td>______</td>
+        </tr>
+    </table>
+
+    <div style="margin-top: 40px; padding: 20px; background: #f5f5f5; border-radius: 8px;">
+        <h3>בקרת מסמך:</h3>
+        <ul style="list-style: none; padding: 0;">
+            <li><strong>גרסה:</strong> 1.0</li>
+            <li><strong>עודכן לאחרונה:</strong> 15 בדצמבר 2025</li>
+            <li><strong>סקירה הבאה:</strong> 15 בינואר 2026</li>
+            <li><strong>הפצה:</strong> פנימי - הנהלה וצוותים טכניים</li>
+        </ul>
+    </div>
+
+    <div style="margin-top: 40px; padding: 20px; background: #e3f2fd; border-radius: 8px; text-align: center;">
+        <h3 style="margin-top: 0;">שאלות או הבהרות?</h3>
+        <p><strong>צור קשר:</strong> צוות פרויקט Avivi Solutions</p>
+        <p><strong>אימייל:</strong> [כתובת אימייל]</p>
+        <p><strong>טלפון:</strong> [מספר טלפון]</p>
+    </div>
+</div>
+
+<div class="no-print" style="position: fixed; bottom: 20px; left: 20px; background: #1a5490; color: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); cursor: pointer;" onclick="window.print()">
+    🖨️ הדפס לPDF
+</div>
+
+</body>
+</html>
