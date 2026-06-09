@@ -80,7 +80,10 @@ def _send_failure_alert(step: str, error: str, service_account_info: dict,
 
         creds = sa.Credentials.from_service_account_info(
             service_account_info,
-            scopes=["https://www.googleapis.com/auth/gmail.send"],
+            scopes=[
+                "https://www.googleapis.com/auth/gmail.send",
+                "https://www.googleapis.com/auth/gmail.compose",
+            ],
         ).with_subject(sender)
         service = build("gmail", "v1", credentials=creds, cache_discovery=False)
 
@@ -108,26 +111,42 @@ def _check_api_key():
     return None
 
 
-def _fetch_david_records(api_base, access_token, start_date, top, acct_mgr):
-    """קורא GetFeedbackData מ-API של דוד. מחזיר list."""
+def _fetch_david_records(api_base, access_token, start_date, top, acct_mgr,
+                         max_retries=3, retry_delay=15):
+    """קורא GetFeedbackData מ-API של דוד. מחזיר list. מנסה עד max_retries פעמים."""
     body = {"StartDate": start_date, "top": int(top)}
     if acct_mgr:
         body["AccountManagerEmail"] = acct_mgr
 
-    resp = requests.post(
-        f"{api_base}/services/AutomationFeedback/GetFeedbackData",
-        headers={
-            "Authorization":  f"Bearer {access_token}",
-            "Content-Type":   "application/json",
-        },
-        json=body,
-        timeout=300,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    if not isinstance(data, list):
-        raise ValueError("תגובת API של דוד אינה JSON array")
-    return data
+    last_exc = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            if attempt > 1:
+                log.warning(f"  retry {attempt}/{max_retries} עבור {acct_mgr or 'all'} (ממתין {retry_delay}s)")
+                time.sleep(retry_delay)
+
+            resp = requests.post(
+                f"{api_base}/services/AutomationFeedback/GetFeedbackData",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type":  "application/json",
+                },
+                json=body,
+                timeout=300,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if not isinstance(data, list):
+                raise ValueError("תגובת API של דוד אינה JSON array")
+            if attempt > 1:
+                log.info(f"  הצליח בניסיון {attempt}")
+            return data
+
+        except Exception as e:
+            last_exc = e
+            log.warning(f"  ניסיון {attempt}/{max_retries} נכשל: {e}")
+
+    raise last_exc
 
 
 # =============================================================================
