@@ -37,7 +37,7 @@ FIELD_FUND_TYPE        = "FundInstitutionType"
 FIELD_STATUS_DESC      = "StatusDescription"
 
 # שדות API שנוספו לאחרונה
-FIELD_INCOME_TAX_AUTH_NUMBER = "IncomeTaxAuthorizationNumber"  # קוד אוצר נוסף אפריל 2026
+FIELD_INCOME_TAX_AUTH_NUMBER = "FundInstitutionTaxNumber"  # שם השדה בפועל ב-API (IncomeTaxAuthorizationNumber לא קיים)
 
 # שדות שיגיעו מדוד בעתיד
 FIELD_FIRST_NAME       = "EmployeeFirstName"

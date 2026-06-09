@@ -39,7 +39,7 @@ RESPONSIBILITY_MAP = {
 }
 
 # מיפוי ספרת ביקורת → קרן פנסיה ברירת מחדל (מוסדי-3)
-# ספרה אחרונה של ת.ז. → (IncomeTaxAuthorizationNumber, FundInstitutionIdentityNumber)
+# ספרה אחרונה של ת.ז. → (FundInstitutionTaxNumber, FundInstitutionIdentityNumber)
 DEFAULT_FUND_MAP = {
     0: {"income_tax_auth": "163",   "fund_id": "512065202"},   # אייל
     1: {"income_tax_auth": "163",   "fund_id": "512065202"},   # אייל
