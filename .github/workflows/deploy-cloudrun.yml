@@ -48,6 +48,7 @@ jobs:
       - name: Enforce scaling settings
         run: |
           gcloud run services update hasheket-runner \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
             --region=me-west1 \
             --min-instances=1 \
             --max-instances=2
