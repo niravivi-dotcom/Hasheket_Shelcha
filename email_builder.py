@@ -24,10 +24,19 @@ from mapping_loader import (
 _HTML_STYLE = """
 <style>
   body { font-family: Arial, sans-serif; direction: rtl; text-align: right; font-size: 14px; color: #333; }
-  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
-  th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: right; }
-  th { background-color: #f0f4f8; font-weight: bold; }
-  tr:nth-child(even) { background-color: #fafafa; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; table-layout: fixed; }
+  th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: right; word-wrap: break-word; overflow-wrap: break-word; vertical-align: top; }
+  th { background-color: #dce8f5; font-weight: bold; }
+  tr:nth-child(even) { background-color: #f0f4f8; }
+  tr:nth-child(odd)  { background-color: #ffffff; }
+  tr:hover { background-color: #e8f0fe; }
+  .col-id      { width: 9%; }
+  .col-name    { width: 14%; }
+  .col-fund    { width: 22%; }
+  .col-type    { width: 10%; }
+  .col-desc    { width: 18%; }
+  .col-action  { width: 20%; }
+  .col-chodesh { width: 7%; }
   .footer { margin-top: 24px; font-size: 12px; color: #888; }
 </style>
 """
@@ -288,15 +297,24 @@ def _employer_table(records):
 
     return f"""
 <table>
+  <colgroup>
+    <col class="col-id">
+    <col class="col-name">
+    <col class="col-fund">
+    <col class="col-type">
+    <col class="col-desc">
+    <col class="col-action">
+    <col class="col-chodesh">
+  </colgroup>
   <thead>
     <tr>
-      <th>מ.ז. עובד</th>
-      <th>שם מלא</th>
-      <th>שם קופה</th>
-      <th>סוג קופה</th>
-      <th>תיאור שגיאה</th>
-      <th>טיפול נדרש</th>
-      <th>חודש שכר</th>
+      <th class="col-id">מ.ז. עובד</th>
+      <th class="col-name">שם מלא</th>
+      <th class="col-fund">שם קופה</th>
+      <th class="col-type">סוג קופה</th>
+      <th class="col-desc">תיאור שגיאה</th>
+      <th class="col-action">טיפול נדרש</th>
+      <th class="col-chodesh">חודש שכר</th>
     </tr>
   </thead>
   <tbody>{rows_html}
