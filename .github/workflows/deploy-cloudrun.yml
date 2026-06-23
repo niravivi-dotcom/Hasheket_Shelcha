@@ -44,3 +44,10 @@ jobs:
             --min-instances=1
             --max-instances=2
             --set-env-vars=GMAIL_SERVICE_ACCOUNT_B64=${{ secrets.GMAIL_SERVICE_ACCOUNT_B64 }},API_SECRET_KEY=${{ secrets.API_SECRET_KEY }}
+
+      - name: Enforce scaling settings
+        run: |
+          gcloud run services update hasheket-runner \
+            --region=me-west1 \
+            --min-instances=1 \
+            --max-instances=2
