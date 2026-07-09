@@ -25,11 +25,10 @@ _HTML_STYLE = """
 <style>
   body { font-family: Arial, sans-serif; direction: rtl; text-align: right; font-size: 14px; color: #333; }
   table { border-collapse: collapse; width: 100%; margin: 16px 0; table-layout: fixed; }
-  th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: right; word-wrap: break-word; overflow-wrap: break-word; vertical-align: top; }
-  th { background-color: #dce8f5; font-weight: bold; }
-  tr:nth-child(even) { background-color: #f0f4f8; }
+  th, td { border: 1px solid #4472C4; padding: 8px 12px; text-align: right; word-wrap: break-word; overflow-wrap: break-word; vertical-align: top; }
+  th { background-color: #dce8f5; color: #1F4E79; font-weight: bold; }
+  tr:nth-child(even) { background-color: #EBF3FB; }
   tr:nth-child(odd)  { background-color: #ffffff; }
-  tr:hover { background-color: #e8f0fe; }
   .col-id      { width: 9%; }
   .col-name    { width: 14%; }
   .col-fund    { width: 22%; }
@@ -88,19 +87,13 @@ def _build_mosadi_1(group, mapping):
     customer_name   = meta.get("customer_name") or ""
     fund_name       = meta.get("fund_institution_name") or ""
 
-    subject = f"[מוסדי] {customer_number} {customer_name}".strip()
+    fund_part = f" — {fund_name}" if fund_name else ""
+    subject = f"[מוסדי] {customer_number} {customer_name}{fund_part}".strip()
 
-    file_names = sorted({
-        r.get("original_file_name") for r in records
-        if r.get("original_file_name")
-    })
-    employee_ids = sorted({
-        str(r.get("employee_id")) for r in records
-        if r.get("employee_id")
-    })
-
+    employees  = _collect_employees(records, include_chodesh=True)
+    emp_table  = _employees_table(employees, include_chodesh=True)
+    file_names = sorted({r.get("original_file_name") for r in records if r.get("original_file_name")})
     files_html = _ul_list(file_names, label="שמות הקבצים שדווחו:")
-    ids_html   = _ul_list(employee_ids, label="מספרי זהות עובדים:")
 
     body_html = f"""
 {_HTML_STYLE}
@@ -109,8 +102,8 @@ def _build_mosadi_1(group, mapping):
   <p>התקבל היזון חוזר מ<strong>{fund_name}</strong> עבור המעסיק <strong>{customer_number}</strong>
   בגין העובדים הבאים אשר לא נקלטו באופן תקין למרות שחודשי שכר קודמים עם נתונים זהים נקלטו תקין
   על פי ההיזון החוזר שהתקבל מכם. האם ניתן לבדוק שוב ולשייך?</p>
+  {emp_table}
   {files_html}
-  {ids_html}
   {_signature()}
 </body>
 """
@@ -135,19 +128,12 @@ def _build_mosadi_2(group, mapping):
     customer_name   = meta.get("customer_name") or ""
     fund_name       = meta.get("fund_institution_name") or ""
 
-    subject = f"[מוסדי] {customer_number} {customer_name}".strip()
+    fund_part = f" — {fund_name}" if fund_name else ""
+    subject = f"[מוסדי] {customer_number} {customer_name}{fund_part}".strip()
 
-    employee_rows = ""
+    employees  = _collect_employees(records, include_chodesh=False)
+    emp_table  = _employees_table(employees, include_chodesh=False)
     file_names = sorted({r.get("original_file_name") for r in records if r.get("original_file_name")})
-    seen_ids = set()
-    for r in records:
-        emp_id = str(r.get("employee_id") or "")
-        if not emp_id or emp_id in seen_ids:
-            continue
-        seen_ids.add(emp_id)
-        name = r.get("full_name") or "---"
-        employee_rows += f"<li>{name} -- ת.ז. {emp_id}</li>"
-
     files_html = _ul_list(file_names, label="שמות הקבצים:")
 
     body_html = f"""
@@ -157,7 +143,7 @@ def _build_mosadi_2(group, mapping):
   <p>התקבל היזון חוזר מ<strong>{fund_name}</strong> בגין העובדים הבאים כי אין קרן פנסיה לעובד
   תחת המעסיק. ע"פ הנחיות אגף שוק ההון ביטוח וחיסכון במשרד האוצר לא נדרש ביצוע קבלת בעלות
   בקרן פנסיה. כל הפרטים לקבלת בעלות נמצאים בממשק שדווח אליכם.</p>
-  <ul>{employee_rows}</ul>
+  {emp_table}
   {files_html}
   {_signature()}
 </body>
@@ -183,18 +169,12 @@ def _build_mosadi_3(group, mapping):
     customer_name   = meta.get("customer_name") or ""
     fund_name       = meta.get("fund_institution_name") or ""
 
-    subject = f"[מוסדי] {customer_number} {customer_name}".strip()
+    fund_part = f" — {fund_name}" if fund_name else ""
+    subject = f"[מוסדי] {customer_number} {customer_name}{fund_part}".strip()
 
-    employee_ids = sorted({
-        str(r.get("employee_id")) for r in records
-        if r.get("employee_id")
-    })
-    file_names = sorted({
-        r.get("original_file_name") for r in records
-        if r.get("original_file_name")
-    })
-
-    ids_html   = _ul_list(employee_ids, label="מספרי זהות עובדים:")
+    employees  = _collect_employees(records, include_chodesh=True)
+    emp_table  = _employees_table(employees, include_chodesh=True)
+    file_names = sorted({r.get("original_file_name") for r in records if r.get("original_file_name")})
     files_html = _ul_list(file_names, label="שמות הקבצים שדווחו:")
 
     body_html = f"""
@@ -204,7 +184,7 @@ def _build_mosadi_3(group, mapping):
   <p>על פי נהלי קרן ברירת מחדל, העובדים המפורטים להלן משויכים לקרן
   <strong>{fund_name}</strong> כקרן ברירת המחדל עבור המעסיק <strong>{customer_number}</strong>.
   התקבל היזון חוזר המעיד כי הכספים טרם נקלטו בקרן. נבקשכם לבדוק את הנושא ולטפל בהתאם.</p>
-  {ids_html}
+  {emp_table}
   {files_html}
   {_signature()}
 </body>
@@ -349,6 +329,51 @@ def _employer_excel(records):
 # Helpers
 # =============================================================================
 
+def _collect_employees(records, include_chodesh=False):
+    """אוסף עובדים ייחודיים עם שם ות.ז (ואופציונלית חודש שכר)."""
+    seen = set()
+    result = []
+    for r in records:
+        emp_id = str(r.get("employee_id") or "").strip()
+        if not emp_id or emp_id in seen:
+            continue
+        seen.add(emp_id)
+        entry = {
+            "id":   emp_id,
+            "name": r.get("full_name") or "---",
+            "desc": r.get("error_description") or "",
+        }
+        if include_chodesh:
+            entry["chodesh"] = str(r.get("_raw", {}).get("CHODESH_MASKORET") or "")
+        result.append(entry)
+    return result
+
+
+def _employees_table(employees, include_chodesh=False):
+    """מחזיר טבלת HTML של עובדים — ת.ז + שם + חודש שכר אם רלוונטי."""
+    if not employees:
+        return ""
+    rows = ""
+    for e in employees:
+        chodesh_td = f"<td>{e.get('chodesh', '')}</td>" if include_chodesh else ""
+        rows += f"<tr><td>{e['id']}</td><td>{e['name']}</td><td>{e.get('desc','')}</td>{chodesh_td}</tr>"
+
+    chodesh_th = "<th>חודש שכר</th>" if include_chodesh else ""
+
+    return f"""
+<table style="width:100%; table-layout:auto;">
+  <thead>
+    <tr>
+      <th style="min-width:110px;">ת.ז. עובד</th>
+      <th style="min-width:160px;">שם עובד</th>
+      <th>תיאור הבעיה</th>
+      {chodesh_th}
+    </tr>
+  </thead>
+  <tbody>{rows}</tbody>
+</table>"""
+
+
 def _render_subject(template_str, meta):
     if not template_str:
         return None
@@ -370,6 +395,7 @@ def _ul_list(items, label=""):
 
 def _nl2br(text):
     return (text or "").replace("\n", "<br>\n")
+
 
 
 def _signature():
