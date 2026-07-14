@@ -24,21 +24,16 @@ from mapping_loader import (
 _HTML_STYLE = """
 <style>
   body { font-family: Arial, sans-serif; direction: rtl; text-align: right; font-size: 14px; color: #333; }
-  table { border-collapse: collapse; width: 100%; margin: 16px 0; table-layout: fixed; }
-  th, td { border: 1px solid #4472C4; padding: 8px 12px; text-align: right; word-wrap: break-word; overflow-wrap: break-word; vertical-align: top; }
-  th { background-color: #dce8f5; color: #1F4E79; font-weight: bold; }
-  tr:nth-child(even) { background-color: #EBF3FB; }
-  tr:nth-child(odd)  { background-color: #ffffff; }
-  .col-id      { width: 9%; }
-  .col-name    { width: 14%; }
-  .col-fund    { width: 22%; }
-  .col-type    { width: 10%; }
-  .col-desc    { width: 18%; }
-  .col-action  { width: 20%; }
-  .col-chodesh { width: 7%; }
   .footer { margin-top: 24px; font-size: 12px; color: #888; }
 </style>
 """
+
+# Inline styles — Gmail strips <style> blocks, so all table styling must be inline
+_TH    = "background-color:#dce8f5;color:#1F4E79;font-weight:bold;border:1px solid #4472C4;padding:8px 12px;text-align:right;"
+_TD    = "border:1px solid #4472C4;padding:8px 12px;text-align:right;vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;"
+_TABLE = "border-collapse:collapse;width:100%;margin:16px 0;font-family:Arial,sans-serif;font-size:14px;direction:rtl;"
+_TR_EVEN = "background-color:#EBF3FB;"
+_TR_ODD  = "background-color:#ffffff;"
 
 _MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -256,7 +251,8 @@ def _dedup_records(records):
 
 def _employer_table(records):
     rows_html = ""
-    for r in _dedup_records(records):
+    for i, r in enumerate(_dedup_records(records)):
+        tr_bg  = _TR_EVEN if i % 2 else _TR_ODD
         emp_id    = r.get("employee_id") or ""
         name      = r.get("full_name") or "---"
         fund_name = r.get("fund_institution_name") or "---"
@@ -265,36 +261,27 @@ def _employer_table(records):
         action    = r.get("explanation_employer") or ""
         chodesh   = r.get("_raw", {}).get("CHODESH_MASKORET") or ""
         rows_html += f"""
-        <tr>
-          <td>{emp_id}</td>
-          <td>{name}</td>
-          <td>{fund_name}</td>
-          <td>{fund_type}</td>
-          <td>{desc}</td>
-          <td>{action}</td>
-          <td>{chodesh}</td>
+        <tr style="{tr_bg}">
+          <td style="{_TD}">{emp_id}</td>
+          <td style="{_TD}">{name}</td>
+          <td style="{_TD}">{fund_name}</td>
+          <td style="{_TD}">{fund_type}</td>
+          <td style="{_TD}">{desc}</td>
+          <td style="{_TD}">{action}</td>
+          <td style="{_TD}">{chodesh}</td>
         </tr>"""
 
     return f"""
-<table>
-  <colgroup>
-    <col class="col-id">
-    <col class="col-name">
-    <col class="col-fund">
-    <col class="col-type">
-    <col class="col-desc">
-    <col class="col-action">
-    <col class="col-chodesh">
-  </colgroup>
+<table style="{_TABLE}">
   <thead>
     <tr>
-      <th class="col-id">מ.ז. עובד</th>
-      <th class="col-name">שם מלא</th>
-      <th class="col-fund">שם קופה</th>
-      <th class="col-type">סוג קופה</th>
-      <th class="col-desc">תיאור שגיאה</th>
-      <th class="col-action">טיפול נדרש</th>
-      <th class="col-chodesh">חודש שכר</th>
+      <th style="{_TH}">מ.ז. עובד</th>
+      <th style="{_TH}">שם מלא</th>
+      <th style="{_TH}">שם קופה</th>
+      <th style="{_TH}">סוג קופה</th>
+      <th style="{_TH}">תיאור שגיאה</th>
+      <th style="{_TH}">טיפול נדרש</th>
+      <th style="{_TH}">חודש שכר</th>
     </tr>
   </thead>
   <tbody>{rows_html}
@@ -350,23 +337,30 @@ def _collect_employees(records, include_chodesh=False):
 
 
 def _employees_table(employees, include_chodesh=False):
-    """מחזיר טבלת HTML של עובדים — ת.ז + שם + חודש שכר אם רלוונטי."""
+    """מחזיר טבלת HTML של עובדים — ת.ז + שם + תיאור + חודש שכר אם רלוונטי."""
     if not employees:
         return ""
     rows = ""
-    for e in employees:
-        chodesh_td = f"<td>{e.get('chodesh', '')}</td>" if include_chodesh else ""
-        rows += f"<tr><td>{e['id']}</td><td>{e['name']}</td><td>{e.get('desc','')}</td>{chodesh_td}</tr>"
+    for i, e in enumerate(employees):
+        tr_bg = _TR_EVEN if i % 2 else _TR_ODD
+        chodesh_td = f"<td style=\"{_TD}{tr_bg}\">{e.get('chodesh', '')}</td>" if include_chodesh else ""
+        rows += (
+            f"<tr style=\"{tr_bg}\">"
+            f"<td style=\"{_TD}\">{e['id']}</td>"
+            f"<td style=\"{_TD}\">{e['name']}</td>"
+            f"<td style=\"{_TD}\">{e.get('desc','')}</td>"
+            f"{chodesh_td}</tr>"
+        )
 
-    chodesh_th = "<th>חודש שכר</th>" if include_chodesh else ""
+    chodesh_th = f"<th style=\"{_TH}\">חודש שכר</th>" if include_chodesh else ""
 
     return f"""
-<table style="width:100%; table-layout:auto;">
+<table style="{_TABLE}">
   <thead>
     <tr>
-      <th style="min-width:110px;">ת.ז. עובד</th>
-      <th style="min-width:160px;">שם עובד</th>
-      <th>תיאור הבעיה</th>
+      <th style="{_TH}">ת.ז. עובד</th>
+      <th style="{_TH}">שם עובד</th>
+      <th style="{_TH}">תיאור הבעיה</th>
       {chodesh_th}
     </tr>
   </thead>
