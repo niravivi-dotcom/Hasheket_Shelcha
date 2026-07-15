@@ -208,6 +208,8 @@ def run_pilot_from_api_v2():
     top           = request.form.get("top", "10000").strip().lstrip("=")
     acct_mgr_raw  = request.form.get("account_manager_email", "").strip().lstrip("=")
     acct_mgr_list = [m.strip() for m in acct_mgr_raw.split(",") if m.strip()]
+    dry_run       = request.form.get("dry_run", "false").strip().lower() == "true"
+    DEV_RECIPIENT = "niravivi@spring-ai.co.il"
 
     mapping_file = request.files.get("mapping")
     if mapping_file is None:
@@ -297,6 +299,13 @@ def run_pilot_from_api_v2():
         return jsonify({"ok": False, "message": f"שגיאה בבניית מיילים: {e}"}), 500
     log.info(f"שלב 5 הסתיים ({time.time()-t0:.1f}s)")
 
+    # --- DEV mode: prefix subjects with [DEV] ---
+    if dry_run:
+        for _, content in email_results:
+            if content:
+                content["subject"] = f"[DEV] {content['subject']}"
+        log.info(f"[DEV] subject prefix הוחל על {sum(1 for _, c in email_results if c)} מיילים")
+
     # --- שלב 6: send / create drafts ---
     log.info("שלב 6: יצירת drafts ב-Gmail")
     t0 = time.time()
@@ -306,6 +315,7 @@ def run_pilot_from_api_v2():
             email_results,
             service_account_info,
             default_impersonate,
+            dry_run_recipient=DEV_RECIPIENT if dry_run else None,
         )
     except Exception as e:
         err_msg = f"{e}\n{traceback.format_exc()}"
@@ -314,6 +324,24 @@ def run_pilot_from_api_v2():
 
     gmail_summary = summarize_results(send_results)
     log.info(f"שלב 6 הסתיים: {gmail_summary} ({time.time()-t0:.1f}s)")
+
+    # --- DEV mode: סיום מוקדם — לא מעדכנים SetFeedbackStatus ---
+    if dry_run:
+        log.info(f"=== [DEV] pipeline הסתיים — {gmail_summary['ok']} מיילים נשלחו ל-{DEV_RECIPIENT}. SetFeedbackStatus לא עודכן. ===")
+        return jsonify({
+            "ok":      True,
+            "message": f"[DEV] pipeline הסתיים — {gmail_summary['ok']} מיילים נשלחו ל-{DEV_RECIPIENT}. SetFeedbackStatus לא עודכן.",
+            "dry_run": True,
+            "stats": {
+                "fetched":       fetched,
+                "classified":    len(classified),
+                "skipped":       len(skipped_list),
+                "groups":        len(groups),
+                "emails_ok":     gmail_summary["ok"],
+                "emails_fail":   gmail_summary["failed"],
+                "total_seconds": round(time.time() - run_start, 1),
+            },
+        })
 
     # --- שלב 7: build payload ---
     log.info("שלב 7: build payload")

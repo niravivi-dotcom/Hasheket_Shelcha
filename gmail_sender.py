@@ -29,14 +29,15 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from mapping_loader import FORMAT_CASE_MGR
 
-GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.compose"]
+GMAIL_SCOPES      = ["https://www.googleapis.com/auth/gmail.compose"]
+GMAIL_SCOPES_SEND = ["https://www.googleapis.com/auth/gmail.send"]
 
 
 # =============================================================================
 # Public API
 # =============================================================================
 
-def send_all_groups(email_results, service_account_info, default_impersonate, max_workers=20):
+def send_all_groups(email_results, service_account_info, default_impersonate, max_workers=20, dry_run_recipient=None):
     """
     מעבד את כל הקבוצות ויוצר drafts ב-Gmail.
 
@@ -70,7 +71,7 @@ def send_all_groups(email_results, service_account_info, default_impersonate, ma
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_map = {
-            executor.submit(_process_one, group, email_content, impersonate, service_account_info): idx
+            executor.submit(_process_one, group, email_content, impersonate, service_account_info, dry_run_recipient): idx
             for idx, (group, email_content, impersonate) in enumerate(tasks)
         }
         for future in as_completed(future_map):
@@ -89,53 +90,67 @@ def send_all_groups(email_results, service_account_info, default_impersonate, ma
 # Internal
 # =============================================================================
 
-def _process_one(group, email_content, impersonate, service_account_info):
-    """יוצר draft אחד ב-Gmail. מחזיר SendResult."""
-    to_email = email_content.get("to_email")
-
+def _process_one(group, email_content, impersonate, service_account_info, dry_run_recipient=None):
+    """יוצר draft אחד ב-Gmail, או שולח אמיתי ב-DEV mode. מחזיר SendResult."""
     if not impersonate:
         return _error_result(group, "impersonate_email חסר — לא ניתן ליצור draft")
 
-    # אם to_email חסר או לא תקין (לא כתובת מייל) — fallback ל-impersonate
+    to_email = email_content.get("to_email")
     if not to_email or "@" not in str(to_email):
         to_email = impersonate
 
     try:
-        service = _get_gmail_service(service_account_info, impersonate)
-        raw     = _build_mime(email_content)
-        created = service.users().drafts().create(
-            userId="me",
-            body={"message": {"raw": raw}},
-        ).execute()
-
-        return {
-            "group_key":    group["group_key"],
-            "email_format": group["email_format"],
-            "ok":           True,
-            "draft_id":     created.get("id"),
-            "impersonate":  impersonate,
-            "record_ids":   [r["record_id"] for r in group.get("records", [])],
-            "error":        None,
-        }
+        if dry_run_recipient:
+            # DEV mode — שולח מייל אמיתי לכתובת הבדיקה (לא draft)
+            service = _get_gmail_service(service_account_info, impersonate, send_scope=True)
+            raw     = _build_mime(email_content, to_override=dry_run_recipient)
+            service.users().messages().send(userId="me", body={"raw": raw}).execute()
+            return {
+                "group_key":    group["group_key"],
+                "email_format": group["email_format"],
+                "ok":           True,
+                "draft_id":     None,   # אין draft בDEV mode
+                "impersonate":  impersonate,
+                "record_ids":   [r["record_id"] for r in group.get("records", [])],
+                "error":        None,
+            }
+        else:
+            # Production — יוצר draft בתיבת מנהלת התיק
+            service = _get_gmail_service(service_account_info, impersonate)
+            raw     = _build_mime(email_content)
+            created = service.users().drafts().create(
+                userId="me",
+                body={"message": {"raw": raw}},
+            ).execute()
+            return {
+                "group_key":    group["group_key"],
+                "email_format": group["email_format"],
+                "ok":           True,
+                "draft_id":     created.get("id"),
+                "impersonate":  impersonate,
+                "record_ids":   [r["record_id"] for r in group.get("records", [])],
+                "error":        None,
+            }
 
     except Exception as e:
         return _error_result(group, str(e), impersonate=impersonate)
 
 
-def _get_gmail_service(service_account_info, impersonate_email):
+def _get_gmail_service(service_account_info, impersonate_email, send_scope=False):
     from google.oauth2 import service_account as sa_module
     from googleapiclient.discovery import build
 
+    scopes = GMAIL_SCOPES_SEND if send_scope else GMAIL_SCOPES
     creds = sa_module.Credentials.from_service_account_info(
-        service_account_info, scopes=GMAIL_SCOPES
+        service_account_info, scopes=scopes
     ).with_subject(impersonate_email)
     return build("gmail", "v1", credentials=creds)
 
 
-def _build_mime(email_content):
+def _build_mime(email_content, to_override=None):
     """בונה MIME message מ-EmailContent ומחזיר base64url string."""
     msg = MIMEMultipart()
-    msg["to"]      = email_content.get("to_email", "")
+    msg["to"]      = to_override or email_content.get("to_email", "")
     msg["subject"] = email_content.get("subject", "")
 
     cc = email_content.get("cc_email")
