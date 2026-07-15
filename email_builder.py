@@ -205,7 +205,7 @@ def _build_employer(group, mapping):
     employer = meta.get("customer_name") or meta.get("employer_name") or ""
     subject  = f"[מעסיק] ח.פ {customer} {employer}".strip()
 
-    intro  = "שלום,\n\nמצורפים למייל זה תשובות הקופות לגבי קליטת הכספים לקופות העובדים. האם ידוע ובטיפול?"
+    intro  = "שלום,\n\nמצורפים למייל זה תשובות הקופות לגבי אי קליטת הכספים לקופות העובדים. האם ידוע ובטיפול?"
     footer = "בכל שאלה נשמח לסייע."
 
     table_html = _employer_table(records)
