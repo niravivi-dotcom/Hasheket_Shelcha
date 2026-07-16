@@ -315,7 +315,6 @@ def run_pilot_from_api_v2():
             email_results,
             service_account_info,
             default_impersonate,
-            dry_run_recipient=DEV_RECIPIENT if dry_run else None,
         )
     except Exception as e:
         err_msg = f"{e}\n{traceback.format_exc()}"
