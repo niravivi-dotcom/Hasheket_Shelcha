@@ -44,7 +44,7 @@ from mapping_loader    import load_mapping
 from record_classifier import classify_all, apply_employer_max_counter_routing
 from record_grouper    import group_records, summarize_groups
 from email_builder     import build_all_emails
-from gmail_sender      import send_all_groups, summarize_results
+from gmail_sender      import send_all_groups, summarize_results, send_dev_report
 from payload_builder   import build_payload, summarize_payload
 from report_builder    import build_run_report, build_case_manager_reports
 
@@ -329,6 +329,28 @@ def run_pilot_from_api_v2():
     # --- DEV mode: סיום מוקדם — לא מעדכנים SetFeedbackStatus ---
     if dry_run:
         dev_mailbox = dev_impersonate or "תיבות מנהלות תיקים"
+
+        # בניית דו"ח ריצה ושליחה למייל
+        run_dt = datetime.utcnow()
+        try:
+            report_bytes = build_run_report(
+                groups, send_results,
+                skipped_records=skipped_list,
+                raw_records=records_list,
+                run_date=run_dt,
+            )
+            if dev_impersonate and service_account_info:
+                sent_ok = send_dev_report(
+                    report_bytes=report_bytes,
+                    run_date=run_dt,
+                    sender=dev_impersonate,
+                    recipient="niravivi@spring-ai.co.il",
+                    service_account_info=service_account_info,
+                )
+                log.info(f"[DEV] דו\"ח ריצה {'נשלח' if sent_ok else 'נכשל'} ל-niravivi@spring-ai.co.il")
+        except Exception as _e:
+            log.warning(f"[DEV] בניית/שליחת דו\"ח נכשלה: {_e}")
+
         log.info(f"=== [DEV] pipeline הסתיים — {gmail_summary['ok']} drafts נוצרו ב-{dev_mailbox}. SetFeedbackStatus לא עודכן. ===")
         return jsonify({
             "ok":      True,

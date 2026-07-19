@@ -195,3 +195,46 @@ def summarize_results(send_results):
     fail  = sum(1 for r in send_results if r and not r.get("ok"))
     total = len(send_results)
     return {"total": total, "ok": ok, "failed": fail}
+
+
+# =============================================================================
+# DEV report sender
+# =============================================================================
+
+def send_dev_report(report_bytes, run_date, sender, recipient, service_account_info):
+    """
+    שולח דו"ח Excel של ריצת DEV.
+    FROM: sender (dev_impersonate, למשל Ido@hspension.co.il)
+    TO:   recipient (niravivi@spring-ai.co.il)
+    """
+    try:
+        service = _get_gmail_service(service_account_info, sender, send_scope=True)
+
+        msg = MIMEMultipart()
+        msg["Subject"] = f"[DEV] דו\"ח ריצה — {run_date.strftime('%d/%m/%Y %H:%M')} UTC"
+        msg["From"]    = sender
+        msg["To"]      = recipient
+        msg.attach(MIMEText(
+            f"[DEV] סיכום ריצת DEV.\n"
+            f"מצורף דו\"ח Excel עם גיליון מעקב pipeline מלא.",
+            "plain", "utf-8"
+        ))
+
+        filename = f"run_report_DEV_{run_date.strftime('%Y%m%d_%H%M')}.xlsx"
+        part = MIMEBase(
+            "application",
+            "vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        part.set_payload(report_bytes)
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", "attachment", filename=filename)
+        msg.attach(part)
+
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+        service.users().messages().send(userId=sender, body={"raw": raw}).execute()
+        return True
+
+    except Exception as e:
+        import logging as _log
+        _log.getLogger(__name__).warning(f"send_dev_report נכשל: {e}")
+        return False
