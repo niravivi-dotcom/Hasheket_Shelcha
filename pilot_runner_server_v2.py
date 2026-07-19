@@ -208,8 +208,8 @@ def run_pilot_from_api_v2():
     top           = request.form.get("top", "10000").strip().lstrip("=")
     acct_mgr_raw  = request.form.get("account_manager_email", "").strip().lstrip("=")
     acct_mgr_list = [m.strip() for m in acct_mgr_raw.split(",") if m.strip()]
-    dry_run       = request.form.get("dry_run", "false").strip().lower() == "true"
-    DEV_RECIPIENT = "niravivi@spring-ai.co.il"
+    dry_run         = request.form.get("dry_run", "false").strip().lower() == "true"
+    dev_impersonate = request.form.get("dev_impersonate", "").strip()
 
     mapping_file = request.files.get("mapping")
     if mapping_file is None:
@@ -299,12 +299,14 @@ def run_pilot_from_api_v2():
         return jsonify({"ok": False, "message": f"שגיאה בבניית מיילים: {e}"}), 500
     log.info(f"שלב 5 הסתיים ({time.time()-t0:.1f}s)")
 
-    # --- DEV mode: prefix subjects with [DEV] ---
+    # --- DEV mode: prefix subjects with [DEV] + override impersonation ---
     if dry_run:
         for _, content in email_results:
             if content:
                 content["subject"] = f"[DEV] {content['subject']}"
-        log.info(f"[DEV] subject prefix הוחל על {sum(1 for _, c in email_results if c)} מיילים")
+                if dev_impersonate:
+                    content["account_manager_email"] = dev_impersonate
+        log.info(f"[DEV] prefix [DEV] הוחל | impersonate → {dev_impersonate or 'כל מנהלת בנפרד'}")
 
     # --- שלב 6: send / create drafts ---
     log.info("שלב 6: יצירת drafts ב-Gmail")
@@ -326,10 +328,11 @@ def run_pilot_from_api_v2():
 
     # --- DEV mode: סיום מוקדם — לא מעדכנים SetFeedbackStatus ---
     if dry_run:
-        log.info(f"=== [DEV] pipeline הסתיים — {gmail_summary['ok']} מיילים נשלחו ל-{DEV_RECIPIENT}. SetFeedbackStatus לא עודכן. ===")
+        dev_mailbox = dev_impersonate or "תיבות מנהלות תיקים"
+        log.info(f"=== [DEV] pipeline הסתיים — {gmail_summary['ok']} drafts נוצרו ב-{dev_mailbox}. SetFeedbackStatus לא עודכן. ===")
         return jsonify({
             "ok":      True,
-            "message": f"[DEV] pipeline הסתיים — {gmail_summary['ok']} מיילים נשלחו ל-{DEV_RECIPIENT}. SetFeedbackStatus לא עודכן.",
+            "message": f"[DEV] pipeline הסתיים — {gmail_summary['ok']} drafts נוצרו ב-{dev_mailbox}. SetFeedbackStatus לא עודכן.",
             "dry_run": True,
             "stats": {
                 "fetched":       fetched,
@@ -401,5 +404,5 @@ def run_pilot_from_api_v2():
 
 if __name__ == "__main__":
     host = os.environ.get("PILOT_RUNNER_HOST", "127.0.0.1")
-    port = int(os.environ.get("PILOT_RUNNER_PORT", "8788"))   # 8788 כדי לא להתנגש עם v1
+    port = int(os.environ.get("PILOT_RUNNER_PORT", "8788"))   # 8788
     app.run(host=host, port=port, debug=False)
