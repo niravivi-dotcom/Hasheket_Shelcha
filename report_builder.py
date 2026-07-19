@@ -23,7 +23,7 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 
 
-def build_run_report(groups, send_results, skipped_records=None, raw_records=None, run_date=None):
+def build_run_report(groups, send_results, skipped_records=None, raw_records=None, run_date=None, top=None):
     """
     groups          : מ-group_records()
     send_results    : מ-send_all_groups()  [רשימת SendResult dicts]
@@ -122,7 +122,7 @@ def build_run_report(groups, send_results, skipped_records=None, raw_records=Non
     bio.seek(0)
     wb = load_workbook(bio)
     _style_workbook(wb, run_date)
-    _build_dashboard_sheet(wb, groups, skipped_records or [], run_date)
+    _build_dashboard_sheet(wb, groups, skipped_records or [], run_date, top=top)
     if raw_records:
         _build_pipeline_sheet(wb, raw_records, groups, skipped_records or [], draft_map)
 
@@ -167,7 +167,7 @@ def _style_workbook(wb, run_date):
         ws.freeze_panes = "A2"
 
 
-def _build_dashboard_sheet(wb, groups, skipped_records, run_date):
+def _build_dashboard_sheet(wb, groups, skipped_records, run_date, top=None):
     """מוסיף גיליון דשבורד עם 4 טבלאות סיכום."""
     ws = wb.create_sheet("דשבורד")
     ws.sheet_view.rightToLeft = True
@@ -227,7 +227,21 @@ def _build_dashboard_sheet(wb, groups, skipped_records, run_date):
     row = 1
     _hcell(ws, row, 1, f"דשבורד — ריצה {run_date.strftime('%d/%m/%Y %H:%M')} UTC")
     ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=3)
-    row += 2
+    row += 1
+
+    # אזהרת truncation
+    _top = int(top) if top else None
+    _truncation_warning = _top and (total_fetched >= int(_top * 0.75))
+    if _truncation_warning:
+        warn_cell = ws.cell(row=row, column=1,
+            value=f"⚠️ אזהרה: נשלפו {total_fetched} רשומות מתוך TOP={_top} ({total_fetched/_top*100:.0f}%). קיים סיכון לחיתוך נתונים!")
+        warn_cell.font = Font(bold=True, color="FF0000", name="Arial", size=11)
+        warn_cell.fill = PatternFill("solid", start_color="FFF2CC", end_color="FFF2CC")
+        warn_cell.alignment = CENTER
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=3)
+        row += 1
+
+    row += 1
 
     _tcell(ws, row, 1, "קטגוריה"); _tcell(ws, row, 2, "כמות"); _tcell(ws, row, 3, "אחוז")
     row += 1

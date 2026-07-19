@@ -201,7 +201,7 @@ def summarize_results(send_results):
 # DEV report sender
 # =============================================================================
 
-def send_dev_report(report_bytes, run_date, sender, recipient, service_account_info):
+def send_dev_report(report_bytes, run_date, sender, recipient, service_account_info, truncation_warning=False):
     """
     שולח דו"ח Excel של ריצת DEV.
     FROM: sender (dev_impersonate, למשל Ido@hspension.co.il)
@@ -214,9 +214,10 @@ def send_dev_report(report_bytes, run_date, sender, recipient, service_account_i
         msg["Subject"] = f"[DEV] דו\"ח ריצה — {run_date.strftime('%d/%m/%Y %H:%M')} UTC"
         msg["From"]    = sender
         msg["To"]      = recipient
+        warning_line = ("\n\n⚠️ אזהרה: כמות הרשומות שנשלפו מתקרבת לסף ה-TOP. בדוק גיליון דשבורד בקובץ המצורף!" if truncation_warning else "")
         msg.attach(MIMEText(
             f"[DEV] סיכום ריצת DEV.\n"
-            f"מצורף דו\"ח Excel עם גיליון מעקב pipeline מלא.",
+            f"מצורף דו\"ח Excel עם גיליון מעקב pipeline מלא.{warning_line}",
             "plain", "utf-8"
         ))
 

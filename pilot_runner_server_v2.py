@@ -333,11 +333,13 @@ def run_pilot_from_api_v2():
         # בניית דו"ח ריצה ושליחה למייל
         run_dt = datetime.utcnow()
         try:
+            truncation_warning = len(records_list) >= int(int(top) * 0.75)
             report_bytes = build_run_report(
                 groups, send_results,
                 skipped_records=skipped_list,
                 raw_records=records_list,
                 run_date=run_dt,
+                top=top,
             )
             if dev_impersonate and service_account_info:
                 sent_ok = send_dev_report(
@@ -346,6 +348,7 @@ def run_pilot_from_api_v2():
                     sender=dev_impersonate,
                     recipient="niravivi@spring-ai.co.il",
                     service_account_info=service_account_info,
+                    truncation_warning=truncation_warning,
                 )
                 log.info(f"[DEV] דו\"ח ריצה {'נשלח' if sent_ok else 'נכשל'} ל-niravivi@spring-ai.co.il")
         except Exception as _e:
@@ -382,7 +385,7 @@ def run_pilot_from_api_v2():
     import base64 as _b64
     run_dt = datetime.utcnow()
     try:
-        report_bytes = build_run_report(groups, send_results, skipped_records=skipped_list, raw_records=records_list, run_date=run_dt)
+        report_bytes = build_run_report(groups, send_results, skipped_records=skipped_list, raw_records=records_list, run_date=run_dt, top=top)
         report_b64 = _b64.b64encode(report_bytes).decode("utf-8")
     except Exception as e:
         log.warning(f"report build failed: {e}")
