@@ -38,7 +38,7 @@ jobs:
           region: me-west1
           image: me-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/hasheket-runner/hasheket-runner:${{ github.sha }}
           flags: >
-            --memory=2Gi
+            --memory=4Gi
             --cpu=1
             --timeout=3600
             --min-instances=1
