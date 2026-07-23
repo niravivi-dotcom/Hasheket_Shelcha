@@ -41,7 +41,7 @@ sys.path.insert(0, str(APP_DIR))
 
 # engine v2 modules
 from mapping_loader    import load_mapping
-from record_classifier import classify_all, apply_employer_max_counter_routing
+from record_classifier import classify_all, apply_employer_max_counter_routing, apply_cross_error_inheritance
 from record_grouper    import group_records, summarize_groups
 from email_builder     import build_all_emails
 from gmail_sender      import send_all_groups, summarize_results, send_dev_report
@@ -272,6 +272,7 @@ def run_pilot_from_api_v2():
     # --- שלב 3.5: employer max-counter routing ---
     try:
         classified = apply_employer_max_counter_routing(classified)
+        classified = apply_cross_error_inheritance(classified)
     except Exception as e:
         err_msg = f"{e}\n{traceback.format_exc()}"
         _alert("employer max-counter routing", err_msg)
@@ -354,6 +355,13 @@ def run_pilot_from_api_v2():
         except Exception as _e:
             log.warning(f"[DEV] בניית/שליחת דו\"ח נכשלה: {_e}")
 
+        # דוחות למנהלות תיק
+        try:
+            cm_reports = build_case_manager_reports(groups, send_results, skipped_records=skipped_list, run_date=run_dt)
+        except Exception as _e:
+            log.warning(f"[DEV] בניית דוחות CM נכשלה: {_e}")
+            cm_reports = []
+
         log.info(f"=== [DEV] pipeline הסתיים — {gmail_summary['ok']} drafts נוצרו ב-{dev_mailbox}. SetFeedbackStatus לא עודכן. ===")
         return jsonify({
             "ok":      True,
@@ -368,6 +376,7 @@ def run_pilot_from_api_v2():
                 "emails_fail":   gmail_summary["failed"],
                 "total_seconds": round(time.time() - run_start, 1),
             },
+            "cm_reports": cm_reports,
         })
 
     # --- שלב 7: build payload ---

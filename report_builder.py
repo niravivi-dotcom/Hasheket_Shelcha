@@ -544,11 +544,26 @@ def build_case_manager_reports(groups, send_results, skipped_records=None, run_d
                 unique.append(g)
         cm_groups[em] = unique
 
+    from mapping_loader import FORMAT_CASE_MGR
+
     results = []
     for cm_email, cm_grps in cm_groups.items():
+        # סינון קבוצת מנהלת תיק — רק רשומות של מנהלת תיק זו בלבד
+        filtered_grps = []
+        for g in cm_grps:
+            if g.get("email_format") == FORMAT_CASE_MGR:
+                filtered_records = [
+                    r for r in g["records"]
+                    if (r.get("_raw", {}).get("CustomerAccountManagerEmail") or "") == cm_email
+                ]
+                if filtered_records:
+                    filtered_grps.append({**g, "records": filtered_records})
+            else:
+                filtered_grps.append(g)
+
         # גיליון pipeline מסונן — רק רשומות של מנהלת תיק זו
         cm_raw = []
-        for g in cm_grps:
+        for g in filtered_grps:
             for r in g["records"]:
                 raw = r.get("_raw", {})
                 if (raw.get("CustomerAccountManagerEmail") or "") == cm_email:
@@ -560,7 +575,7 @@ def build_case_manager_reports(groups, send_results, skipped_records=None, run_d
         ]
 
         report_bytes = build_run_report(
-            cm_grps, send_results,
+            filtered_grps, send_results,
             skipped_records=cm_skipped,
             raw_records=cm_raw,
             run_date=run_date

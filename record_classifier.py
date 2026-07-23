@@ -170,6 +170,30 @@ def classify_record(record, mapping):
     if status_desc and "מבוטלת" in str(status_desc):
         return None, "רשומה מבוטלת"
 
+    # סטטוס 6: "רשומה לא נקלטה — הטיפול הסתיים" → מנהלת תיק
+    # שימו לב: שונה מ"מבוטלת" — הרשומה לא נדלגת אלא מנותבת לטיפול מנהלת תיק
+    # הבדיקה לפני counter<1 כי רשומות אלו עשויות להגיע עם counter=0
+    feedback_status_raw = _get(record, FIELD_FEEDBACK_STATUS)
+    try:
+        feedback_status_id = int(float(str(feedback_status_raw).strip())) if feedback_status_raw is not None else None
+    except (ValueError, TypeError):
+        feedback_status_id = None
+
+    if feedback_status_id == 6:
+        try:
+            c_val_fs = int(float(counter)) if counter is not None else 0
+        except (ValueError, TypeError):
+            c_val_fs = 0
+        return _build_result(
+            record, record_id, customer,
+            error_code=_get(record, FIELD_ERROR_CODE),
+            counter=counter, rule=None,
+            responsibility=RESP_CASE_MANAGER,
+            email_format=FORMAT_CASE_MGR,
+            recipients={"to_role": "מנהלת תיק", "cc_role": None, "path": "status_6_ended"},
+            escalation_level=c_val_fs,
+        ), None
+
     # counter < 1
     try:
         c_val = int(float(counter)) if counter is not None else 0
@@ -239,6 +263,15 @@ def classify_record(record, mapping):
     condition_field  = rule.get("pre_mail_condition_field")
 
     if condition_result is True:
+        # שינוי 2: אם יש פעולה מפורשת ל-condition=True — החל אותה
+        true_action = rule.get("pre_mail_condition_true_action")
+        true_value  = rule.get("pre_mail_condition_true_value")
+        if true_action == "change_format" and true_value:
+            email_format = true_value
+        elif true_action == "change_recipient" and true_value:
+            to_role_true = true_value
+            responsibility = RESPONSIBILITY_MAP.get(to_role_true, responsibility)
+            email_format   = _infer_format_from_role(to_role_true, email_format)
         recipients = {
             "to_role": rule.get("responsibility_he"),
             "cc_role": rule.get("cc_responsibility"),
@@ -279,6 +312,54 @@ def classify_record(record, mapping):
                          condition_field=condition_field,
                          escalation_level=c_val), None
 
+
+
+def apply_cross_error_inheritance(classified_records):
+    """
+    שינוי 1: ירושת גיל שגיאות cross-error-code תחת אותו גוף אחראי.
+    קיבוץ: (employee_id, customer_number, fund_institution_id, responsibility)
+    אם ישנה רשומה בקבוצה עם counter >= 3 → כל הרשומות בקבוצה עוברות למנהלת תיק.
+    אחרת → counter_weeks של הרשומות הצעירות מתעדכן למקסימום הקבוצה.
+    """
+    groups: dict = {}
+    for i, rec in enumerate(classified_records):
+        emp_id       = str(rec.get("employee_id") or "")
+        customer     = str(rec.get("customer_number") or "")
+        fund_id      = str(rec.get("fund_institution_id") or "")
+        responsibility = str(rec.get("responsibility") or "")
+        if not emp_id or not fund_id:
+            continue
+        key = (emp_id, customer, fund_id, responsibility)
+        groups.setdefault(key, []).append(i)
+
+    for key, indices in groups.items():
+        if len(indices) < 2:
+            continue  # רק קבוצות עם יותר מרשומה אחת
+
+        max_counter = max(
+            classified_records[i].get("counter_weeks") or 0
+            for i in indices
+        )
+
+        if max_counter < 1:
+            continue
+
+        # עדכן counter_weeks לרשומות צעירות יותר
+        for i in indices:
+            if (classified_records[i].get("counter_weeks") or 0) < max_counter:
+                classified_records[i]["counter_weeks"] = max_counter
+
+        # הסלמה: אם counter >= 3 → כולן למנהלת תיק
+        if max_counter >= 3:
+            for i in indices:
+                if classified_records[i].get("email_format") != FORMAT_CASE_MGR:
+                    classified_records[i]["email_format"]  = FORMAT_CASE_MGR
+                    classified_records[i]["responsibility"] = RESP_CASE_MANAGER
+                    classified_records[i]["to_role"]        = "מנהלת תיק"
+                    classified_records[i]["cc_role"]        = None
+                    classified_records[i]["routing_path"]   = f"cross_error_inheritance_c{max_counter}"
+
+    return classified_records
 
 def _infer_format_from_role(role, default_format):
     if role in ('רו"ח', "סוכן", "מעסיק", "איש קשר 1 מעסיק"):
