@@ -300,6 +300,9 @@ def classify_record(record, mapping):
             "path":    "default",
         }
 
+    # שמור אחריות מקורית לפני escalation (נדרש עבור apply_cross_error_inheritance)
+    base_responsibility = responsibility
+
     # הסלמה: counter >= 3
     if c_val >= 3:
         responsibility = RESP_CASE_MANAGER
@@ -310,7 +313,8 @@ def classify_record(record, mapping):
                          responsibility, email_format, recipients,
                          condition_result=condition_result,
                          condition_field=condition_field,
-                         escalation_level=c_val), None
+                         escalation_level=c_val,
+                         base_responsibility=base_responsibility), None
 
 
 
@@ -326,10 +330,11 @@ def apply_cross_error_inheritance(classified_records):
         emp_id       = str(rec.get("employee_id") or "")
         customer     = str(rec.get("customer_number") or "")
         fund_id      = str(rec.get("fund_institution_id") or "")
-        responsibility = str(rec.get("responsibility") or "")
+        # השתמש ב-base_responsibility (לפני escalation) כדי לקבץ נכון
+        base_resp    = str(rec.get("base_responsibility") or rec.get("responsibility") or "")
         if not emp_id or not fund_id:
             continue
-        key = (emp_id, customer, fund_id, responsibility)
+        key = (emp_id, customer, fund_id, base_resp)
         groups.setdefault(key, []).append(i)
 
     for key, indices in groups.items():
@@ -372,7 +377,8 @@ def _infer_format_from_role(role, default_format):
 
 def _build_result(record, record_id, customer, error_code, counter,
                   rule, responsibility, email_format, recipients,
-                  condition_result=None, condition_field=None, escalation_level=None):
+                  condition_result=None, condition_field=None, escalation_level=None,
+                  base_responsibility=None):
     rule = rule or {}
     return {
         "record_id":       record_id,
@@ -380,6 +386,7 @@ def _build_result(record, record_id, customer, error_code, counter,
         "error_code":      error_code,
         "customer_name":   _get(record, "CustomerName"),
         "responsibility":  responsibility,
+        "base_responsibility": base_responsibility if base_responsibility is not None else responsibility,
         "email_format":    email_format,
         "excluded":        False,
         "to_role":         recipients.get("to_role"),
