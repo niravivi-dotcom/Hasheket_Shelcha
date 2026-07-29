@@ -242,7 +242,12 @@ def _dedup_records(records):
     seen = set()
     result = []
     for r in records:
-        key = (str(r.get("employee_id") or ""), r.get("error_code"))
+        key = (
+            str(r.get("employee_id") or ""),
+            r.get("error_code"),
+            str(r.get("fund_institution_id") or ""),
+            str(r.get("_raw", {}).get("CHODESH_MASKORET") or ""),
+        )
         if key not in seen:
             seen.add(key)
             result.append(r)
