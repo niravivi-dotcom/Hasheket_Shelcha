@@ -317,21 +317,29 @@ def _employer_excel(records):
 # =============================================================================
 
 def _collect_employees(records, include_chodesh=False):
-    """אוסף עובדים ייחודיים עם שם ות.ז (ואופציונלית חודש שכר)."""
-    seen = set()
-    result = []
+    """אוסף עובדים ייחודיים עם שם ות.ז (ואופציונלית כל חודשי השכר)."""
+    seen = {}  # emp_id -> entry dict
     for r in records:
         emp_id = str(r.get("employee_id") or "").strip()
-        if not emp_id or emp_id in seen:
+        if not emp_id:
             continue
-        seen.add(emp_id)
-        entry = {
-            "id":   emp_id,
-            "name": r.get("full_name") or "---",
-            "desc": r.get("error_description") or "",
-        }
+        if emp_id not in seen:
+            seen[emp_id] = {
+                "id":     emp_id,
+                "name":   r.get("full_name") or "---",
+                "desc":   r.get("error_description") or "",
+                "_months": [],
+            }
         if include_chodesh:
-            entry["chodesh"] = str(r.get("_raw", {}).get("CHODESH_MASKORET") or "")
+            chodesh = str(r.get("_raw", {}).get("CHODESH_MASKORET") or "").strip()
+            if chodesh and chodesh not in seen[emp_id]["_months"]:
+                seen[emp_id]["_months"].append(chodesh)
+
+    result = []
+    for entry in seen.values():
+        if include_chodesh:
+            entry["chodesh"] = ", ".join(sorted(entry["_months"]))
+        del entry["_months"]
         result.append(entry)
     return result
 
