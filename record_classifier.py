@@ -242,6 +242,7 @@ def classify_record(record, mapping):
     # שלב 1: בדיקת קרן ברירת מחדל (מוסדי-3)
     default_fund_match = _check_default_fund_condition(record, rule)
     if default_fund_match is True:
+        base_responsibility = responsibility  # שמור לפני escalation עבור cross_error_inheritance
         recipients = {
             "to_role": rule.get("responsibility_he"),
             "cc_role": rule.get("cc_responsibility"),
@@ -257,7 +258,8 @@ def classify_record(record, mapping):
                              responsibility, email_format, recipients,
                              condition_result=True,
                              condition_field=rule.get("pre_mail_condition_field"),
-                             escalation_level=c_val), None
+                             escalation_level=c_val,
+                             base_responsibility=base_responsibility), None
 
     # שלב 2: PreMailCondition
     condition_result = _check_pre_mail_condition(record, rule)
