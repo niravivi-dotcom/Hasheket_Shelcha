@@ -16,7 +16,7 @@ record_classifier.py
 import pandas as pd
 from mapping_loader import (
     FORMAT_EXCLUDED, FORMAT_CASE_MGR, FORMAT_MOSADI_3,
-    RESP_CASE_MANAGER, RESP_EMPLOYER, RESP_ACCOUNTANT, RESP_AGENT,
+    RESP_CASE_MANAGER,
     RESPONSIBILITY_MAP,
     DEFAULT_FUND_MAP,
 )
@@ -248,7 +248,7 @@ def classify_record(record, mapping):
             "cc_role": rule.get("cc_responsibility"),
             "path":    "default_fund_match",
         }
-        if c_val >= 3:
+        if c_val >= 2:
             responsibility = RESP_CASE_MANAGER
             email_format   = FORMAT_CASE_MGR
             recipients     = {"to_role": "מנהלת תיק", "cc_role": None, "path": f"escalation_c{c_val}"}
@@ -306,10 +306,8 @@ def classify_record(record, mapping):
     # שמור אחריות מקורית לפני escalation (נדרש עבור apply_cross_error_inheritance)
     base_responsibility = responsibility
 
-    # הסלמה: מעסיק/רו"ח/סוכן counter >= 2, מוסדי counter >= 3
-    _EMPLOYER_RESPS = {RESP_EMPLOYER, RESP_ACCOUNTANT, RESP_AGENT}
-    _escalation_threshold = 2 if base_responsibility in _EMPLOYER_RESPS else 3
-    if c_val >= _escalation_threshold:
+    # הסלמה: כל סוגי האחריות — counter >= 2 → מנהלת תיק
+    if c_val >= 2:
         responsibility = RESP_CASE_MANAGER
         email_format   = FORMAT_CASE_MGR
         recipients     = {"to_role": "מנהלת תיק", "cc_role": None, "path": f"escalation_c{c_val}"}
@@ -359,10 +357,8 @@ def apply_cross_error_inheritance(classified_records):
             if (classified_records[i].get("counter_weeks") or 0) < max_counter:
                 classified_records[i]["counter_weeks"] = max_counter
 
-        # הסלמה: מעסיק/רו"ח/סוכן counter >= 2, מוסדי counter >= 3
-        _base_resp = key[3]
-        _threshold = 2 if _base_resp in (RESP_EMPLOYER, RESP_ACCOUNTANT, RESP_AGENT) else 3
-        if max_counter >= _threshold:
+        # הסלמה: כל סוגי האחריות — counter >= 2 → מנהלת תיק
+        if max_counter >= 2:
             for i in indices:
                 if classified_records[i].get("email_format") != FORMAT_CASE_MGR:
                     classified_records[i]["email_format"]  = FORMAT_CASE_MGR
